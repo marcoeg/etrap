@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# etrap_cdc_agent.py - Complete agent with NFT minting and S3 metadata storage
+# Debug version of CDC agent with extra logging at critical points
 
 import redis
 import json
@@ -365,8 +365,16 @@ class ETRAPCDCAgent:
             operation = value_data.get('op')
             operation_map = {'c': 'INSERT', 'u': 'UPDATE', 'd': 'DELETE', 'r': 'SNAPSHOT'}
             
+            # DEBUG: Show raw event data
+            print(f"\n🔍 DEBUG - Raw CDC Event:")
+            print(f"   Operation: {operation_map.get(operation, operation)}")
+            print(f"   After (raw): {value_data.get('after')}")
+            
             before_data = self.decode_record(value_data.get('before'))
             after_data = self.decode_record(value_data.get('after'))
+            
+            # DEBUG: Show decoded data
+            print(f"   After (decoded): {after_data}")
             
             source = value_data.get('source', {})
             
@@ -603,56 +611,20 @@ class ETRAPCDCAgent:
             # Create deterministic hash of the transaction
             # For INSERT/UPDATE, hash the 'after' data; for DELETE, hash the 'before' data
             if event['operation'] in ['INSERT', 'UPDATE'] and event['after']:
-                # Normalize the data to match database format before hashing
-                # This is necessary because Debezium converts timestamps to epoch format
-                normalized_data = event['after'].copy()
+                # DEBUG: Show what we're hashing
+                print(f"\n🔐 DEBUG - Hashing transaction {idx}:")
+                print(f"   Operation: {event['operation']}")
+                print(f"   Raw 'after' data: {event['after']}")
                 
-                # Convert epoch timestamps back to ISO format for any field ending in '_at'
-                for field, value in normalized_data.items():
-                    if field.endswith('_at'):
-                        # Check if it's already in ISO format (string)
-                        if isinstance(value, str):
-                            # Already in ISO format, no conversion needed
-                            continue
-                        # Check if it's an epoch timestamp that needs conversion
-                        elif isinstance(value, (int, float)) and value > 1000000000000:
-                            # Convert epoch microseconds or milliseconds to ISO format
-                            if value > 1000000000000000:  # Microseconds (16+ digits)
-                                dt = datetime.fromtimestamp(value / 1000000)
-                            else:  # Milliseconds (13 digits)
-                                dt = datetime.fromtimestamp(value / 1000)
-                            # Format to match PostgreSQL timestamp format
-                            iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-                            # Remove trailing zeros but keep at least milliseconds
-                            iso_str = iso_str.rstrip('0').rstrip('.')
-                            if '.' not in iso_str:
-                                iso_str += '.000'
-                            normalized_data[field] = iso_str
+                # Hash the raw transaction data WITHOUT decoding for privacy-compliant verification
+                # This ensures users can verify using exact database values
+                tx_data_to_hash = json.dumps(event['after'], sort_keys=True, separators=(',', ':'))
                 
-                tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
+                print(f"   JSON to hash: {tx_data_to_hash}")
+                
             elif event['operation'] == 'DELETE' and event['before']:
-                # Normalize the data for DELETE operations too
-                normalized_data = event['before'].copy()
-                
-                # Convert epoch timestamps back to ISO format
-                for field, value in normalized_data.items():
-                    if field.endswith('_at'):
-                        # Check if it's already in ISO format (string)
-                        if isinstance(value, str):
-                            continue
-                        # Check if it's an epoch timestamp
-                        elif isinstance(value, (int, float)) and value > 1000000000000:
-                            if value > 1000000000000000:  # Microseconds
-                                dt = datetime.fromtimestamp(value / 1000000)
-                            else:  # Milliseconds
-                                dt = datetime.fromtimestamp(value / 1000)
-                            iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-                            iso_str = iso_str.rstrip('0').rstrip('.')
-                            if '.' not in iso_str:
-                                iso_str += '.000'
-                            normalized_data[field] = iso_str
-                
-                tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
+                # Hash the raw transaction data WITHOUT decoding
+                tx_data_to_hash = json.dumps(event['before'], sort_keys=True, separators=(',', ':'))
             else:
                 # Fallback to full event structure
                 tx_data_to_hash = json.dumps({
@@ -663,13 +635,7 @@ class ETRAPCDCAgent:
                 }, sort_keys=True, separators=(',', ':'))
             
             tx_hash = hashlib.sha256(tx_data_to_hash.encode()).hexdigest()
-            
-            # DEBUG: Show what we're hashing for ACC999
-            # if normalized_data.get('account_id') == 'ACC999':
-            #     print(f"\n🔍 DEBUG - ACC999 Transaction:")
-            #     print(f"   Normalized data: {json.dumps(normalized_data, indent=2)}")
-            #     print(f"   JSON for hash: {tx_data_to_hash}")
-            #     print(f"   Computed hash: {tx_hash}")
+            print(f"   Computed hash: {tx_hash}")
             
             tx_data['hash'] = tx_hash
             transaction_hashes.append(tx_hash)
@@ -880,7 +846,7 @@ class ETRAPCDCAgent:
 
 
 if __name__ == "__main__":
-    print("🚀 ETRAP CDC Agent Starting...")
+    print("🚀 ETRAP CDC Agent Starting (DEBUG VERSION)...")
     print("📡 PostgreSQL → Debezium → Redis → S3 → NEAR")
     print("-" * 60)
     

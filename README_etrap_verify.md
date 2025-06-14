@@ -41,21 +41,56 @@ export AWS_DEFAULT_REGION=us-east-1
 ### Basic Verification
 
 ```bash
-# Verify a transaction from JSON string
+# Verify using exact database values (automatic normalization)
 ./etrap_verify.py -c acme.testnet --data '{
-  "id": 84,
-  "account_id": "ACC900",
-  "amount": 90000.00,
+  "id": 109,
+  "account_id": "ACC999",
+  "amount": 999.99,
   "type": "C",
-  "created_at": "2025-06-14T00:53:56.930417",
-  "reference": "Large deposit - verification required"
+  "created_at": "2025-06-14 07:10:55.461133",
+  "reference": "TEST-VERIFY"
+}'
+
+# The tool automatically handles:
+# - Numeric amounts: 999.99 → "999.99"
+# - Timestamp separators: "2025-06-14 07:10:55" → "2025-06-14T07:10:55"
+# - Timestamp precision: 6 decimal places → 3 decimal places
+
+# You can also provide pre-normalized data
+./etrap_verify.py -c acme.testnet --data '{
+  "id": 109,
+  "account_id": "ACC999",
+  "amount": "999.99",
+  "type": "C",
+  "created_at": "2025-06-14T07:10:55.461",
+  "reference": "TEST-VERIFY"
 }'
 
 # Verify from a file
 ./etrap_verify.py -c acme.testnet --data-file transaction.json
 
-# Verify from stdin (great for piping)
-cat transaction.json | ./etrap_verify.py -c acme.testnet --data -
+# Verify from stdin (great for piping from SQL query)
+echo '{"id":109,"account_id":"ACC999","amount":999.99,"type":"C","created_at":"2025-06-14 07:10:55.461133","reference":"TEST-VERIFY"}' | ./etrap_verify.py -c acme.testnet --data -
+```
+
+### Data Format Normalization
+
+The verification tool automatically normalizes your input data to match how the CDC agent processes it:
+
+| Field Type | Database Format | Normalized Format | Notes |
+|------------|----------------|-------------------|-------|
+| **Amounts** | `999.99` (number) | `"999.99"` (string) | Numeric values converted to strings |
+| **Timestamps** | `2025-06-14 07:10:55` | `2025-06-14T07:10:55` | Space replaced with 'T' separator |
+| **Precision** | `.461133` (6 decimals) | `.461` (3 decimals) | Microseconds truncated to milliseconds |
+| **No decimals** | `07:10:55` | `07:10:55.000` | Missing milliseconds added as .000 |
+
+**Examples:**
+```sql
+-- Query your database
+SELECT * FROM financial_transactions WHERE id = 109;
+-- Returns: 109|ACC999|999.99|C|2025-06-14 07:10:55.461133|TEST-VERIFY
+
+-- Copy the exact values for verification - no manual formatting needed!
 ```
 
 ### Optimization Hints

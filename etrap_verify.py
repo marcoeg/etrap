@@ -63,13 +63,52 @@ class ETRAPTransactionVerifier:
             print(f"❌ Error calling {method}: {e}")
             return None
     
+    def normalize_transaction_data(self, transaction_data: Dict) -> Dict:
+        """
+        Normalize transaction data to match CDC agent format.
+        This allows users to input data exactly as returned by the database.
+        """
+        normalized = transaction_data.copy()
+        
+        # Normalize numeric amounts to strings
+        if 'amount' in normalized and isinstance(normalized['amount'], (int, float)):
+            normalized['amount'] = str(normalized['amount'])
+        
+        # Normalize timestamps
+        for field, value in list(normalized.items()):
+            if field.endswith('_at') and isinstance(value, str):
+                # Replace space with T separator if present
+                if ' ' in value and 'T' not in value:
+                    value = value.replace(' ', 'T')
+                
+                # Parse and reformat to ensure consistent precision
+                try:
+                    # Handle various timestamp formats
+                    if '.' in value:
+                        # Has fractional seconds
+                        dt_part, frac_part = value.rsplit('.', 1)
+                        # Normalize to 3 decimal places (milliseconds)
+                        frac_part = frac_part[:3].ljust(3, '0')
+                        normalized[field] = f"{dt_part}.{frac_part}"
+                    else:
+                        # No fractional seconds, add .000
+                        normalized[field] = f"{value}.000"
+                except Exception:
+                    # If parsing fails, keep original
+                    pass
+        
+        return normalized
+    
     def compute_transaction_hash(self, transaction_data: Dict) -> str:
         """
         Compute deterministic hash of transaction data.
         This must match the hash computation in the CDC agent.
         """
+        # Normalize the data first
+        normalized_data = self.normalize_transaction_data(transaction_data)
+        
         # Sort keys to ensure deterministic JSON
-        normalized_json = json.dumps(transaction_data, sort_keys=True, separators=(',', ':'))
+        normalized_json = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
         return hashlib.sha256(normalized_json.encode()).hexdigest()
     
     def verify_merkle_proof(self, leaf_hash: str, proof_path: List[str], 
@@ -98,8 +137,16 @@ class ETRAPTransactionVerifier:
             
             response = self.s3_client.get_object(Bucket=s3_bucket, Key=s3_key)
             return json.loads(response['Body'].read())
+        except self.s3_client.exceptions.NoSuchBucket:
+            # Bucket doesn't exist - skip silently as this is common
+            return None
+        except self.s3_client.exceptions.NoSuchKey:
+            # Key doesn't exist - skip silently
+            return None
         except Exception as e:
-            print(f"⚠️  Error fetching from S3: {e}")
+            # Only print unexpected errors
+            if "AccessDenied" not in str(e):
+                print(f"⚠️  Warning: Could not access S3 ({type(e).__name__})")
             return None
     
     async def find_transaction_in_batch(self, tx_hash: str, batch: Dict) -> Optional[Dict]:
