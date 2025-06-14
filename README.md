@@ -115,9 +115,13 @@ PostgreSQL → Debezium → Redis → CDC Agent → S3 & NEAR Blockchain
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📄 License
+## 📄 Copyright
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+
+This project is proprietary.
+
+Copyright (c) 2025 Graziano Labs Corp. All rights reserved.
+
 
 ## 🏢 Use Cases
 
