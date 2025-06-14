@@ -7,9 +7,10 @@ A production-ready Change Data Capture (CDC) agent that creates immutable audit 
 - **Real-time CDC**: Captures all database changes via Debezium/Redis
 - **Blockchain Anchoring**: Creates NFTs on NEAR blockchain with Merkle roots
 - **Cryptographic Verification**: Proves specific transactions occurred with Merkle proofs
+- **Privacy Compliant**: No transaction data leaves your premises
 - **Generic Architecture**: Works with any PostgreSQL database schema
 - **Regulatory Compliance**: Court-admissible transaction proofs
-- **Flexible Search**: Complex queries with AND/OR operations and time ranges
+- **Pure Verification Model**: You provide data, we prove authenticity
 
 ## 📋 Components
 
@@ -22,12 +23,12 @@ Captures database changes and creates blockchain-backed audit trails:
 - NFT minting on NEAR
 
 ### 2. Transaction Verifier (`etrap_verify.py`)
-Searches and verifies specific transactions:
-- Generic search across any table
-- Complex WHERE clauses
-- Time-based queries
-- Audit report generation
-- Cryptographic proof verification
+Verifies transactions without exposing data:
+- Pure verification model (you provide data to verify)
+- Cryptographic proof using Merkle trees
+- Shows blockchain recording timestamp
+- Privacy compliant (no data search)
+- Audit-ready output formats
 
 ## 🛠️ Installation
 
@@ -76,16 +77,19 @@ python etrap_cdc_agent.py
 ### Verifying Transactions
 
 ```bash
-# Search by account
-python etrap_verify.py -c acme.testnet -d etrapdb -t financial_transactions -w "account_id=ACC500"
+# Verify a specific transaction
+python etrap_verify.py -c acme.testnet --data '{
+  "id": 123,
+  "account_id": "ACC500",
+  "amount": 10000.00,
+  "type": "C"
+}'
 
-# Complex query with time range
-python etrap_verify.py -c acme.testnet -d etrapdb -t financial_transactions \
-    -w "amount>10000 AND type=C" --after "7 days ago"
+# Verify from database export
+python etrap_verify.py -c acme.testnet --data-file transaction.json
 
-# Generate audit report
-python etrap_verify.py -c acme.testnet -d etrapdb -t financial_transactions \
-    -w "account_id=ACC500" --report
+# Quick verification (quiet mode)
+python etrap_verify.py -c acme.testnet --data-file tx.json --quiet
 ```
 
 ## 📊 Architecture

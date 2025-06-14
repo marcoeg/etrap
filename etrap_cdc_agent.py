@@ -596,8 +596,8 @@ class ETRAPCDCAgent:
                 'hash': None,  # Will be set below
                 'user_id': event['source'].get('user', 'system'),
                 'lsn': event['source'].get('lsn'),
-                'transaction_db_id': event['source'].get('txId'),
-                'change_data': event['after'] if event['operation'] in ['INSERT', 'UPDATE'] else event['before']
+                'transaction_db_id': event['source'].get('txId')
+                # Note: change_data removed for privacy compliance
             }
             
             # Create deterministic hash of the transaction
