@@ -1,4 +1,10 @@
-# ETRAP CDC Agent - Enterprise Transaction Recording and Audit Platform
+# ETRAP
+ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based service that creates immutable "receipts" for enterprise database transactions, providing proof of integrity, non-repudiation, and regulatory compliance.
+
+Components:
+
+# CDC Agent - Enterprise Transaction Recording and Audit Platform
+
 
 A production-ready Change Data Capture (CDC) agent that creates immutable audit trails on the NEAR blockchain, providing cryptographic proof of database transactions for regulatory compliance and legal proceedings.
 
