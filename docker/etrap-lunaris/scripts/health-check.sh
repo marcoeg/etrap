@@ -1,0 +1,146 @@
+#!/bin/bash
+set -euo pipefail
+
+# ETRAP Health Check Script
+# Monitors the health of different services
+
+SERVICE="${1:-all}"
+LOG_FILE="/app/logs/health-check.log"
+
+# Create log directory if it doesn't exist
+mkdir -p "$(dirname "$LOG_FILE")"
+
+# Function to log messages
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+}
+
+# Function to check Redis health
+check_redis() {
+    log "Checking Redis health..."
+    
+    if ! redis-cli -h redis -p 6379 ping >/dev/null 2>&1; then
+        log "ERROR: Redis is not responding to ping"
+        return 1
+    fi
+    
+    # Check if Redis is accepting connections
+    if ! redis-cli -h redis -p 6379 info replication >/dev/null 2>&1; then
+        log "ERROR: Redis is not accepting connections"
+        return 1
+    fi
+    
+    log "Redis health check: OK"
+    return 0
+}
+
+# Function to check Debezium health
+check_debezium() {
+    log "Checking Debezium health..."
+    
+    # Check if Debezium process is running
+    if ! grep -q "debezium" /proc/*/cmdline 2>/dev/null; then
+        log "ERROR: Debezium server process not found"
+        return 1
+    fi
+    
+    # Check if offset file exists and is being updated
+    local offset_file="/app/data/offsets.dat"
+    if [ ! -f "$offset_file" ]; then
+        log "WARNING: Debezium offset file not found (may be starting up)"
+        return 0  # Don't fail during startup
+    fi
+    
+    # Check if offset file has been updated recently (within last 5 minutes)
+    local file_age=$(( $(date +%s) - $(stat -c %Y "$offset_file" 2>/dev/null || echo 0) ))
+    if [ $file_age -gt 300 ]; then
+        log "WARNING: Debezium offset file is older than 5 minutes"
+    fi
+    
+    log "Debezium health check: OK"
+    return 0
+}
+
+# Function to check ETRAP Agent health
+check_agent() {
+    log "Checking ETRAP Agent health..."
+    
+    # Check if Python process is running
+    if ! grep -q "etrap_cdc_agent.py" /proc/*/cmdline 2>/dev/null; then
+        log "ERROR: ETRAP CDC Agent process not found"
+        return 1
+    fi
+    
+    # Check Redis connectivity from agent perspective
+    if ! redis-cli -h redis -p 6379 ping >/dev/null 2>&1; then
+        log "ERROR: ETRAP Agent cannot reach Redis"
+        return 1
+    fi
+    
+    # Check if agent can access NEAR credentials
+    local cred_file="/root/.near-credentials/${NEAR_NETWORK:-testnet}/${ORG_ID:-demo}.${NEAR_NETWORK:-testnet}.json"
+    if [ ! -f "$cred_file" ]; then
+        log "ERROR: NEAR credentials file not found: $cred_file"
+        return 1
+    fi
+    
+    # Check if environment variables are set
+    local required_vars=("NEAR_ACCOUNT_ID" "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY")
+    for var in "${required_vars[@]}"; do
+        if [ -z "${!var:-}" ]; then
+            log "ERROR: Required environment variable $var is not set"
+            return 1
+        fi
+    done
+    
+    log "ETRAP Agent health check: OK"
+    return 0
+}
+
+# Function to check overall system health
+check_all() {
+    log "Running comprehensive health check..."
+    
+    local overall_status=0
+    
+    if ! check_redis; then
+        overall_status=1
+    fi
+    
+    if ! check_debezium; then
+        overall_status=1
+    fi
+    
+    if ! check_agent; then
+        overall_status=1
+    fi
+    
+    if [ $overall_status -eq 0 ]; then
+        log "Overall health check: OK"
+    else
+        log "Overall health check: FAILED"
+    fi
+    
+    return $overall_status
+}
+
+# Main health check logic
+case "$SERVICE" in
+    "redis")
+        check_redis
+        ;;
+    "debezium")
+        check_debezium
+        ;;
+    "agent")
+        check_agent
+        ;;
+    "all")
+        check_all
+        ;;
+    *)
+        log "Unknown service: $SERVICE"
+        log "Available services: redis, debezium, agent, all"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,224 @@
+-- PostgreSQL Setup for ETRAP Debezium Integration
+-- This script configures PostgreSQL for Change Data Capture (CDC) with Debezium
+-- 
+-- Parameters (to be substituted):
+-- ${DATABASE_NAME} - Target database name (e.g., etrapdb)
+-- ${DEBEZIUM_USER} - Debezium user name (e.g., debezium)  
+-- ${DEBEZIUM_PASSWORD} - Debezium user password
+-- ${REPLICATION_SLOT} - Replication slot name (e.g., etrap_debezium_slot)
+-- ${PUBLICATION_NAME} - Publication name (e.g., etrap_publication)
+--
+-- Prerequisites:
+-- 1. PostgreSQL must be configured with wal_level = logical
+-- 2. max_replication_slots >= 4 and max_wal_senders >= 4 in postgresql.conf
+-- 3. pg_hba.conf must allow replication connections for debezium user
+-- 4. This script must be run as PostgreSQL superuser (postgres)
+
+\echo '=== ETRAP PostgreSQL Setup Starting ==='
+\echo 'Database: ${DATABASE_NAME}'
+\echo 'Debezium User: ${DEBEZIUM_USER}'
+\echo 'Replication Slot: ${REPLICATION_SLOT}'
+\echo 'Publication: ${PUBLICATION_NAME}'
+\echo ''
+
+-- Connect to the target database
+\c ${DATABASE_NAME}
+
+\echo '=== Step 1: Checking PostgreSQL Configuration ==='
+
+-- Check WAL level
+DO $$
+DECLARE
+    wal_level_setting text;
+BEGIN
+    SELECT setting INTO wal_level_setting FROM pg_settings WHERE name = 'wal_level';
+    IF wal_level_setting != 'logical' THEN
+        RAISE WARNING 'WAL level is %, but should be "logical" for Debezium. Please update postgresql.conf', wal_level_setting;
+    ELSE
+        RAISE NOTICE 'WAL level is correctly set to: %', wal_level_setting;
+    END IF;
+END $$;
+
+-- Check replication slots configuration
+DO $$
+DECLARE
+    max_slots int;
+    max_senders int;
+BEGIN
+    SELECT setting::int INTO max_slots FROM pg_settings WHERE name = 'max_replication_slots';
+    SELECT setting::int INTO max_senders FROM pg_settings WHERE name = 'max_wal_senders';
+    
+    IF max_slots < 4 THEN
+        RAISE WARNING 'max_replication_slots is %, recommend >= 4', max_slots;
+    ELSE
+        RAISE NOTICE 'max_replication_slots: %', max_slots;
+    END IF;
+    
+    IF max_senders < 4 THEN
+        RAISE WARNING 'max_wal_senders is %, recommend >= 4', max_senders;
+    ELSE
+        RAISE NOTICE 'max_wal_senders: %', max_senders;
+    END IF;
+END $$;
+
+\echo ''
+\echo '=== Step 2: Creating Debezium User ==='
+
+-- Drop user if exists (for re-running script)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${DEBEZIUM_USER}') THEN
+        RAISE NOTICE 'User ${DEBEZIUM_USER} already exists, dropping...';
+        EXECUTE 'DROP USER ${DEBEZIUM_USER}';
+    END IF;
+END $$;
+
+-- Create debezium user with replication privileges
+CREATE USER ${DEBEZIUM_USER} WITH REPLICATION PASSWORD '${DEBEZIUM_PASSWORD}';
+
+\echo 'Created user: ${DEBEZIUM_USER}'
+
+\echo ''
+\echo '=== Step 3: Granting Database Permissions ==='
+
+-- Grant database connection
+GRANT CONNECT ON DATABASE ${DATABASE_NAME} TO ${DEBEZIUM_USER};
+
+-- Grant schema usage
+GRANT USAGE ON SCHEMA public TO ${DEBEZIUM_USER};
+
+-- Grant select on all existing tables
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO ${DEBEZIUM_USER};
+
+-- Grant select on all existing sequences
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO ${DEBEZIUM_USER};
+
+-- Grant select on future tables and sequences
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ${DEBEZIUM_USER};
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO ${DEBEZIUM_USER};
+
+\echo 'Granted permissions to ${DEBEZIUM_USER} for database ${DATABASE_NAME}'
+
+\echo ''
+\echo '=== Step 4: Managing Replication Slot ==='
+
+-- Drop replication slot if exists (for re-running script)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${REPLICATION_SLOT}') THEN
+        RAISE NOTICE 'Replication slot ${REPLICATION_SLOT} already exists, dropping...';
+        PERFORM pg_drop_replication_slot('${REPLICATION_SLOT}');
+    END IF;
+END $$;
+
+-- Create replication slot
+SELECT pg_create_logical_replication_slot('${REPLICATION_SLOT}', 'pgoutput');
+
+\echo 'Created replication slot: ${REPLICATION_SLOT}'
+
+\echo ''
+\echo '=== Step 5: Managing Publication ==='
+
+-- Drop publication if exists (for re-running script)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '${PUBLICATION_NAME}') THEN
+        RAISE NOTICE 'Publication ${PUBLICATION_NAME} already exists, dropping...';
+        EXECUTE 'DROP PUBLICATION ${PUBLICATION_NAME}';
+    END IF;
+END $$;
+
+-- Create publication for all tables in public schema
+CREATE PUBLICATION ${PUBLICATION_NAME} FOR ALL TABLES;
+
+\echo 'Created publication: ${PUBLICATION_NAME}'
+
+\echo ''
+\echo '=== Step 6: Verification ==='
+
+-- Verify replication slot
+SELECT 
+    'Replication Slot' as component,
+    slot_name,
+    plugin,
+    slot_type,
+    database,
+    active::text as status
+FROM pg_replication_slots 
+WHERE slot_name = '${REPLICATION_SLOT}';
+
+-- Verify publication
+SELECT 
+    'Publication' as component,
+    pubname as slot_name,
+    null as plugin,
+    null as slot_type,
+    current_database() as database,
+    puballtables::text as status
+FROM pg_publication 
+WHERE pubname = '${PUBLICATION_NAME}';
+
+-- Count tables in publication
+SELECT 
+    'Published Tables' as component,
+    '${PUBLICATION_NAME}' as slot_name,
+    null as plugin, 
+    null as slot_type,
+    schemaname as database,
+    count(*)::text as status
+FROM pg_publication_tables 
+WHERE pubname = '${PUBLICATION_NAME}'
+GROUP BY schemaname;
+
+\echo ''
+\echo '=== Step 7: Testing Debezium User Permissions ==='
+
+-- Test as debezium user
+SET ROLE ${DEBEZIUM_USER};
+
+-- Test database access
+SELECT 
+    'Permission Test' as component,
+    current_user as slot_name,
+    current_database() as plugin,
+    'Can Connect' as slot_type,
+    null as database,
+    'OK' as status;
+
+-- Test table access
+SELECT 
+    'Table Access Test' as component,
+    current_user as slot_name,
+    count(*)::text as plugin,
+    'Tables Readable' as slot_type,
+    current_database() as database,
+    'OK' as status
+FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+
+-- Reset role
+RESET ROLE;
+
+\echo ''
+\echo '=== Setup Complete ==='
+\echo 'Next steps:'
+\echo '1. Ensure pg_hba.conf allows replication connections for ${DEBEZIUM_USER}'
+\echo '2. Reload PostgreSQL configuration if needed: SELECT pg_reload_conf();'
+\echo '3. Test connection from Debezium:'
+\echo '   psql "host=YOUR_HOST port=5432 dbname=${DATABASE_NAME} user=${DEBEZIUM_USER} password=${DEBEZIUM_PASSWORD}"'
+\echo ''
+
+-- Final verification query for external testing
+\echo 'Verification query:'
+SELECT 
+    rs.slot_name,
+    rs.plugin,
+    rs.active,
+    p.pubname,
+    p.puballtables,
+    count(pt.tablename) as table_count
+FROM pg_replication_slots rs
+FULL OUTER JOIN pg_publication p ON p.pubname = '${PUBLICATION_NAME}'
+LEFT JOIN pg_publication_tables pt ON pt.pubname = p.pubname
+WHERE rs.slot_name = '${REPLICATION_SLOT}' OR p.pubname = '${PUBLICATION_NAME}'
+GROUP BY rs.slot_name, rs.plugin, rs.active, p.pubname, p.puballtables;

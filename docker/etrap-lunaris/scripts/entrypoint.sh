@@ -1,0 +1,108 @@
+#!/bin/bash
+set -euo pipefail
+
+# ETRAP Container Entrypoint Script
+# Handles startup of different services based on arguments
+
+SERVICE="${1:-debezium}"
+LOG_DIR="/app/logs"
+DATA_DIR="/app/data"
+
+# Create necessary directories
+mkdir -p "$LOG_DIR" "$DATA_DIR"
+
+# Function to wait for Redis to be ready
+wait_for_redis() {
+    echo "Waiting for Redis to be ready..."
+    local max_attempts=30
+    local attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if redis-cli -h redis -p 6379 ping >/dev/null 2>&1; then
+            echo "Redis is ready!"
+            return 0
+        fi
+        echo "Redis not ready, waiting... (attempt $((attempt + 1))/$max_attempts)"
+        sleep 2
+        ((attempt++))
+    done
+    
+    echo "ERROR: Redis failed to become ready after $max_attempts attempts"
+    exit 1
+}
+
+# Function to wait for Debezium to be ready
+wait_for_debezium() {
+    echo "Waiting for Debezium to be ready..."
+    local max_attempts=12
+    local attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        # Check if Redis has any etrap streams (indicates Debezium is working)  
+        if redis-cli -h redis -p 6379 KEYS "etrap*" >/dev/null 2>&1; then
+            echo "Debezium appears to be processing data!"
+            return 0
+        fi
+        echo "Debezium not ready, waiting... (attempt $((attempt + 1))/$max_attempts)"
+        sleep 5
+        ((attempt++))
+    done
+    
+    echo "WARNING: Debezium may not be ready, but continuing anyway..."
+    return 0
+}
+
+# Function to check PostgreSQL connectivity
+check_postgres() {
+    echo "Checking PostgreSQL connectivity..."
+    if [ -z "${POSTGRES_HOST:-}" ]; then
+        echo "ERROR: POSTGRES_HOST environment variable not set"
+        exit 1
+    fi
+    
+    # Simple connectivity check (requires postgresql-client to be installed)
+    # For now, we'll skip this check and let Debezium handle connection errors
+    echo "PostgreSQL connectivity check skipped - Debezium will handle connection"
+}
+
+case "$SERVICE" in
+    "debezium")
+        echo "Starting Debezium Server..."
+        check_postgres
+        wait_for_redis
+        
+        # Start Debezium Server
+        cd /opt/debezium-server
+        exec ./run.sh
+        ;;
+        
+    "agent")
+        echo "Starting ETRAP CDC Agent..."
+        wait_for_redis
+        echo "Skipping Debezium readiness check - proceeding directly"
+        
+        # Verify environment variables
+        required_vars=("NEAR_NETWORK" "NEAR_ACCOUNT_ID" "AWS_ACCESS_KEY_ID" "AWS_SECRET_ACCESS_KEY")
+        for var in "${required_vars[@]}"; do
+            if [ -z "${!var:-}" ]; then
+                echo "ERROR: Required environment variable $var is not set"
+                exit 1
+            fi
+        done
+        
+        # Start ETRAP CDC Agent
+        cd /app
+        exec python etrap_cdc_agent.py
+        ;;
+        
+    "bash")
+        echo "Starting interactive bash shell..."
+        exec /bin/bash
+        ;;
+        
+    *)
+        echo "Unknown service: $SERVICE"
+        echo "Available services: debezium, agent, bash"
+        exit 1
+        ;;
+esac
