@@ -1,14 +1,7 @@
 # ETRAP
 ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based service that creates immutable "receipts" for enterprise database transactions, providing proof of integrity, non-repudiation, and regulatory compliance.
 
-Components:
-
-# CDC Agent - Enterprise Transaction Recording and Audit Platform
-
-
-A production-ready Change Data Capture (CDC) agent that creates immutable audit trails on the NEAR blockchain, providing cryptographic proof of database transactions for regulatory compliance and legal proceedings.
-
-## 🚀 Key Features
+## Key Features
 
 - **Real-time CDC**: Captures all database changes via Debezium/Redis
 - **Blockchain Anchoring**: Creates NFTs on NEAR blockchain with Merkle roots
@@ -20,7 +13,11 @@ A production-ready Change Data Capture (CDC) agent that creates immutable audit 
 
 ## 📋 Components
 
-### 1. CDC Agent (`etrap_cdc_agent.py`)
+### 1. CDC Agent (`etrap_cdc_agent.py`) - Enterprise Transaction Recording and Audit Platform
+
+
+A production-ready Change Data Capture (CDC) agent that creates immutable audit trails on the NEAR blockchain, providing cryptographic proof of database transactions for regulatory compliance and legal proceedings.
+
 Captures database changes and creates blockchain-backed audit trails:
 - Consumes CDC events from Redis streams
 - Intelligent batching for efficiency
@@ -28,30 +25,27 @@ Captures database changes and creates blockchain-backed audit trails:
 - S3 storage for detailed data
 - NFT minting on NEAR
 
-### 2. Transaction Verifier (`etrap_verify.py`)
-Verifies transactions without exposing data:
-- Pure verification model (you provide data to verify)
-- Cryptographic proof using Merkle trees
-- Shows blockchain recording timestamp
-- Privacy compliant (no data search)
-- Audit-ready output formats
+> Transaction verification is done using the `etrap-sdk` in 
+
 
 ## 🛠️ Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/marcoeg/etrap-cdc-agent.git
-cd etrap-cdc-agent
+git clone https://github.com/marcoeg/etrap.git
+cd etrap
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
 
-# Install dependencies
-pip install -r requirements.txt
-```
+## Workflow
+
+  The complete ETRAP deployment workflow is now:
+
+  1. PostgreSQL Setup: ./docker/setup-postgresql.sh (configure CDC)
+  2. NEAR Onboarding: ./onboard_organization.sh (create account/contract)
+  3. Docker Generation: ./generate_etrap_docker.sh (create containers)
+  4. Deployment: docker-compose up -d (run services)
+
+
 
 ## ⚙️ Configuration
 
@@ -72,31 +66,6 @@ export ETRAP_S3_BUCKET=etrap-your-org
 export ETRAP_ORG_ID=your-org
 ```
 
-## 📖 Usage
-
-### Running the CDC Agent
-
-```bash
-python etrap_cdc_agent.py
-```
-
-### Verifying Transactions
-
-```bash
-# Verify a specific transaction
-python etrap_verify.py -c acme.testnet --data '{
-  "id": 123,
-  "account_id": "ACC500",
-  "amount": 10000.00,
-  "type": "C"
-}'
-
-# Verify from database export
-python etrap_verify.py -c acme.testnet --data-file transaction.json
-
-# Quick verification (quiet mode)
-python etrap_verify.py -c acme.testnet --data-file tx.json --quiet
-```
 
 ## 📊 Architecture
 
@@ -117,9 +86,9 @@ PostgreSQL → Debezium → Redis → CDC Agent → S3 & NEAR Blockchain
 
 ## 📝 Documentation
 
-- [CDC Agent Documentation](README_CDC.md)
-- [Transaction Verifier Guide](README_etrap_verify.md)
-- [Implementation Summary](summary.txt)
+- [Onboarding a new organization](./onboarding.md)
+- [Generating ETRAP docker](./docker/README.md)
+- [CDC Agent Documentation](./cdc-agent/README_CDC.md)
 
 ## 🤝 Contributing
 

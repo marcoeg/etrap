@@ -115,7 +115,7 @@ Example:
 
 ```
 
-# Use script
+## Use the onboarding script
 
 A script that executes all the steps needed for onboarding is in `onboarding_organization.sh`.
 Example:
@@ -140,3 +140,11 @@ The log in ` ./logs/onboard_lunaris_20250625_090210.log` contains the full outpu
 > The new account credentials are not listed in the console or the log file and need to be fetched from the `~/near-credentials/testnet/` directory.
 
 >Note: The NEAR account creation must happen on our server that has the etrap.testnet account credentials. The smart contract deployment and initialization can be in the container after copying the new account credentials in there.
+
+## Next step: create the docker container
+Once `onboard_organization.sh` completed it must be followed by Docker container generation for deployment
+to generates a complete, self-contained Docker setup that customers can deploy in their environment.
+
+Follow the instructions in [README](./docker/README.md)
+
+
