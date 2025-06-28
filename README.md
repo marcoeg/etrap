@@ -1,6 +1,8 @@
 # ETRAP
 ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based service that creates immutable "receipts" for enterprise database transactions, providing proof of integrity, non-repudiation, and regulatory compliance.
 
+ETRAP "Evidence Tracking, Recording & Anchoring Platform"
+
 ## Key Features
 
 - **Real-time CDC**: Captures all database changes via Debezium/Redis
@@ -34,11 +36,10 @@ Captures database changes and creates blockchain-backed audit trails:
 # Clone the repository
 git clone https://github.com/marcoeg/etrap.git
 cd etrap
-
-
+```
 ## Workflow
 
-  The complete ETRAP deployment workflow is now:
+The complete ETRAP deployment workflow is now:
 
   1. PostgreSQL Setup: ./docker/setup-postgresql.sh (configure CDC)
   2. NEAR Onboarding: ./onboard_organization.sh (create account/contract)

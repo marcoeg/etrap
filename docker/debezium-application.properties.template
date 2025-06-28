@@ -14,16 +14,16 @@ debezium.source.plugin.name=pgoutput
 debezium.source.slot.name=etrap_debezium_slot
 debezium.source.publication.name=etrap_publication
 debezium.source.schema.include.list=public
-debezium.source.snapshot.mode=initial
+debezium.source.snapshot.mode=never
 
 # Offset storage (file-based for simplicity)
 debezium.source.offset.storage=org.apache.kafka.connect.storage.FileOffsetBackingStore
-debezium.source.offset.storage.file.filename=data/offsets.dat
+debezium.source.offset.storage.file.filename=/app/data/offsets.dat
 debezium.source.offset.flush.interval.ms=60000
 
 # Schema history storage
 debezium.source.schema.history.internal=io.debezium.storage.file.history.FileSchemaHistory
-debezium.source.schema.history.internal.file.filename=data/dbhistory.dat
+debezium.source.schema.history.internal.file.filename=/app/data/dbhistory.dat
 
 # Sink: Redis Stream Configuration
 debezium.sink.type=redis
@@ -31,7 +31,7 @@ debezium.sink.redis.address=redis:6379
 
 # Redis Stream settings
 debezium.sink.redis.message.format=extended
-debezium.sink.redis.null.value=delete
+# Removed debezium.sink.redis.null.value=delete to prevent duplicate DELETE messages
 
 # Data format
 debezium.format.value=json

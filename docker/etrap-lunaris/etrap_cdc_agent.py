@@ -359,21 +359,58 @@ class ETRAPCDCAgent:
     def parse_generic_cdc_event(self, stream, msg_id, data):
         """Parse CDC event without assuming table structure"""
         try:
-            value_data = json.loads(data.get('value', '{}'))
-            key_data = json.loads(data.get('key', '{}')) if 'key' in data else {}
+            # DEBUG: Print raw data for investigation
+            print(f"\n🔍 DEBUG: Raw Redis data for {stream}:{msg_id}")
+            print(f"   Data keys: {list(data.keys())}")
+            print(f"   Raw data: {data}")
+            
+            # Handle empty or missing value data
+            value_str = data.get('value', '{}')
+            print(f"   Value string: '{value_str}' (type: {type(value_str)}, len: {len(value_str) if value_str else 'None'})")
+            
+            if not value_str or value_str.strip() == '':
+                print(f"   ⚠️ Empty value_str, using default '{{}}'")
+                value_str = '{}'
+            value_data = json.loads(value_str)
+            
+            # Handle empty or missing key data  
+            key_str = data.get('key', '{}') if 'key' in data else '{}'
+            if not key_str or key_str.strip() == '':
+                key_str = '{}'
+            key_data = json.loads(key_str)
             
             operation = value_data.get('op')
             operation_map = {'c': 'INSERT', 'u': 'UPDATE', 'd': 'DELETE', 'r': 'SNAPSHOT'}
+            mapped_operation = operation_map.get(operation, operation)
+            
+            print(f"   Operation: {operation} -> {mapped_operation}")
+            print(f"   Before data raw: {value_data.get('before')}")
+            print(f"   After data raw: {value_data.get('after')}")
+            
+            # Skip snapshot events to avoid reprocessing existing data
+            if mapped_operation == 'SNAPSHOT':
+                print(f"   ⏭️  Skipping SNAPSHOT event - not a live transaction")
+                return None
             
             before_data = self.decode_record(value_data.get('before'))
             after_data = self.decode_record(value_data.get('after'))
+            
+            print(f"   Before data decoded: {before_data}")
+            print(f"   After data decoded: {after_data}")
+            
+            # Validate DELETE events have proper before data
+            if mapped_operation == 'DELETE' and not before_data:
+                print(f"⚠️  Warning: DELETE event missing 'before' data - stream: {stream}, msg_id: {msg_id}")
+                print(f"   Raw value_data: {value_data}")
+                # Return None to skip this malformed DELETE event
+                return None
             
             source = value_data.get('source', {})
             
             return {
                 'stream': stream,
                 'message_id': msg_id,
-                'operation': operation_map.get(operation, operation),
+                'operation': mapped_operation,
                 'key': key_data,
                 'before': before_data,
                 'after': after_data,

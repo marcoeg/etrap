@@ -359,21 +359,38 @@ class ETRAPCDCAgent:
     def parse_generic_cdc_event(self, stream, msg_id, data):
         """Parse CDC event without assuming table structure"""
         try:
-            value_data = json.loads(data.get('value', '{}'))
-            key_data = json.loads(data.get('key', '{}')) if 'key' in data else {}
+            # Handle empty or missing value data
+            value_str = data.get('value', '{}')
+            if not value_str or value_str.strip() == '':
+                value_str = '{}'
+            value_data = json.loads(value_str)
+            
+            # Handle empty or missing key data  
+            key_str = data.get('key', '{}') if 'key' in data else '{}'
+            if not key_str or key_str.strip() == '':
+                key_str = '{}'
+            key_data = json.loads(key_str)
             
             operation = value_data.get('op')
             operation_map = {'c': 'INSERT', 'u': 'UPDATE', 'd': 'DELETE', 'r': 'SNAPSHOT'}
+            mapped_operation = operation_map.get(operation, operation)
             
             before_data = self.decode_record(value_data.get('before'))
             after_data = self.decode_record(value_data.get('after'))
+            
+            # Validate DELETE events have proper before data
+            if mapped_operation == 'DELETE' and not before_data:
+                print(f"⚠️  Warning: DELETE event missing 'before' data - stream: {stream}, msg_id: {msg_id}")
+                print(f"   Raw value_data: {value_data}")
+                # Return None to skip this malformed DELETE event
+                return None
             
             source = value_data.get('source', {})
             
             return {
                 'stream': stream,
                 'message_id': msg_id,
-                'operation': operation_map.get(operation, operation),
+                'operation': mapped_operation,
                 'key': key_data,
                 'before': before_data,
                 'after': after_data,

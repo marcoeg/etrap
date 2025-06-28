@@ -134,7 +134,32 @@ CREATE PUBLICATION ${PUBLICATION_NAME} FOR ALL TABLES;
 \echo 'Created publication: ${PUBLICATION_NAME}'
 
 \echo ''
-\echo '=== Step 6: Verification ==='
+\echo '=== Step 6: Configure REPLICA IDENTITY for DELETE Support ==='
+
+-- Set REPLICA IDENTITY to FULL for all tables to support DELETE operations
+-- This ensures DELETE events contain the complete deleted record data
+DO $$
+DECLARE
+    table_record RECORD;
+BEGIN
+    FOR table_record IN 
+        SELECT schemaname, tablename 
+        FROM pg_tables 
+        WHERE schemaname = 'public'
+    LOOP
+        EXECUTE format('ALTER TABLE %I.%I REPLICA IDENTITY FULL', 
+                      table_record.schemaname, 
+                      table_record.tablename);
+        RAISE NOTICE 'Set REPLICA IDENTITY FULL for table: %.%', 
+                     table_record.schemaname, 
+                     table_record.tablename;
+    END LOOP;
+END $$;
+
+\echo 'Configured REPLICA IDENTITY FULL for all tables in public schema'
+
+\echo ''
+\echo '=== Step 7: Verification ==='
 
 -- Verify replication slot
 SELECT 
@@ -170,8 +195,28 @@ FROM pg_publication_tables
 WHERE pubname = '${PUBLICATION_NAME}'
 GROUP BY schemaname;
 
+-- Verify REPLICA IDENTITY settings
+SELECT 
+    'REPLICA IDENTITY' as component,
+    schemaname || '.' || tablename as slot_name,
+    null as plugin,
+    CASE relreplident
+        WHEN 'd' THEN 'DEFAULT'
+        WHEN 'f' THEN 'FULL'
+        WHEN 'i' THEN 'INDEX'
+        WHEN 'n' THEN 'NOTHING'
+        ELSE 'UNKNOWN'
+    END as slot_type,
+    current_database() as database,
+    'OK' as status
+FROM pg_class c 
+JOIN pg_namespace n ON c.relnamespace = n.oid 
+JOIN pg_tables t ON c.relname = t.tablename AND n.nspname = t.schemaname
+WHERE schemaname = 'public'
+ORDER BY tablename;
+
 \echo ''
-\echo '=== Step 7: Testing Debezium User Permissions ==='
+\echo '=== Step 8: Testing Debezium User Permissions ==='
 
 -- Test as debezium user
 SET ROLE ${DEBEZIUM_USER};
