@@ -1,7 +1,19 @@
 # ETRAP
 ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based service that creates immutable "receipts" for enterprise database transactions, providing proof of integrity, non-repudiation, and regulatory compliance.
 
-ETRAP "Evidence Tracking, Recording & Anchoring Platform"
+ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based audit trail system
+that captures database changes and creates immutable proofs on the NEAR blockchain. The system
+combines the reliability of traditional databases with the immutability of blockchain technology,
+creating a tamper-proof audit trail for regulatory compliance and data integrity verification.
+
+The pipeline consists of six key stages:
+1. Database changes captured by PostgreSQL (on-premises)
+2. Change Data Capture (CDC) via Debezium (on-premises)
+3. Event streaming through Redis (on-premises)
+4. Intelligent batching by the ETRAP CDC Agent (on-premises)
+5. Metadata and hash storage in AWS S3 (cloud - no sensitive data)
+6. Immutable hash anchoring NFT on NEAR blockchain (public - no sensitive data)
+
 
 ## Key Features
 
@@ -12,8 +24,15 @@ ETRAP "Evidence Tracking, Recording & Anchoring Platform"
 - **Generic Architecture**: Works with any PostgreSQL database schema
 - **Regulatory Compliance**: Court-admissible transaction proofs
 - **Pure Verification Model**: You provide data, we prove authenticity
+- **CLI for Verification**: Simple and intuitive interface for verifying transactions
+- **Python SDK**: Python SDK for ETRAP with integration examples
 
-## 📋 Components
+
+Critical Privacy Feature: No actual transaction data ever leaves the customer's premises. Only
+cryptographic hashes and metadata are stored externally (S3 and blockchain), ensuring complete data
+sovereignty and compliance with the strictest privacy regulations.
+
+## 📋 Components in this repo
 
 ### 1. CDC Agent (`etrap_cdc_agent.py`) - Enterprise Transaction Recording and Audit Platform
 
