@@ -8,7 +8,13 @@ Example:
 - organization name: **Vantage**
 - organization_id: **vantage**
 
-### 1. Generate NEAR account
+>A master account in the NEAR blockchain is also needed. In the examples `etrap.testnet` is used. Edit `MASTER_ACCOUNT` if using the script.
+
+See below for a script for automatic generation or follow along for manual steps.
+
+IMPORTANT: While the platform is under development, the onboarding of a new organization is in NEAR `testnet`.
+
+### 1. Generate the organization NEAR account
 
 ```
 $ near create-account {organization_id}.testnet --masterAccount etrap.testnet --initialBalance 2
@@ -58,12 +64,16 @@ Account vantage.testnet
 }
 ```
 
-### 3. Deploy organization contract
+### 3. Deploy organization NEAR smart contract
 
 ```
+# Clone the ETRAP NEAR smart contract  from the [repo on Github](https://github.com/marcoeg/etrap-notary). 
+#
 # Set the contract build directory in CONTRACT_DIR
 CONTRACT_DIR={contract_dir}
+```
 
+```
 $ near deploy {organization_id}.testnet $CONTRACT_DIR/etrap_contract.wasm
 
 ```
@@ -103,8 +113,7 @@ Transaction Id jcLBEL2yZxn1pC1uhnywRcUePFpjSSHpo43rXrpHeop
 Open the explorer for more info: https://testnet.nearblocks.io/txns/jcLBEL2yZxn1pC1uhnywRcUePFpjSSHpo43rXrpHeop
 ''
 ```
-
-A script with a unction to check if a transaction succeeded with usage example is in `test_tx_succeed.sh`
+A script to check if a transaction with the new account succeeded is in `test_tx_succeed.sh`
 
 Example:
 ```
@@ -115,12 +124,19 @@ Example:
 
 ```
 
-## Use the onboarding script
+## Using the onboarding script
 
-A script that executes all the steps needed for onboarding is in `onboarding_organization.sh`.
+A script that executes all the steps needed for onboarding is in `onboarding_organization.sh`. 
+
+>The [ETRAP NEAR smart contract repo](https://github.com/marcoeg/etrap-notary) needs to be cloned and accessible by the script. 
+
+- Edit `MASTER_ACCOUNT` and `CONTRACT_DIR` before using the script.
+- Parameters are the Organization Name and ID.
+
 Example:
 ```
 $ ./onboard_organization.sh "Lunaris" "lunaris"
+
 🚀 Starting onboarding for: Lunaris (lunaris.testnet)
 🔧 Creating NEAR account lunaris.testnet...
 🔍 Waiting for account creation tx 2oBsmucrYvELpB6Y23WupLCYukZ94EFce4f9yBgGAf8V to complete...
@@ -135,11 +151,10 @@ $ ./onboard_organization.sh "Lunaris" "lunaris"
 🎉 Onboarding completed for Lunaris (lunaris.testnet)
 📄 Full log written to ./logs/onboard_lunaris_20250625_090210.log
 ```
-The log in ` ./logs/onboard_lunaris_20250625_090210.log` contains the full output.
 
-> The new account credentials are not listed in the console or the log file and need to be fetched from the `~/near-credentials/testnet/` directory.
+The script generates a log in ` ./logs/onboard_lunaris_20250625_090210.log` with the full output.
 
->Note: The NEAR account creation must happen on our server that has the etrap.testnet account credentials. The smart contract deployment and initialization can be in the container after copying the new account credentials in there.
+> The new account credentials are not listed in the console or the log file and if needed they are in the `~/.near-credentials/testnet/` directory in the file `{organization_id}.testnet.json`.
 
 ## Next step: create the docker container
 Once `onboard_organization.sh` completed it must be followed by Docker container generation for deployment
