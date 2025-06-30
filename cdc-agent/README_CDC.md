@@ -1,6 +1,6 @@
-# ETRAP CDC Agent - Detailed Documentation
+# ETRAP CDC Agent
 
-This document provides in-depth technical documentation for the ETRAP CDC Agent component.
+This document provides the technical documentation for the ETRAP CDC Agent component.
 
 ## Overview
 
@@ -9,13 +9,15 @@ The ETRAP CDC Agent is the core component that captures database changes and cre
 
 ### Setup and Installation
 ```bash
-# Create virtual environment
+# Install dependencies using uv
+uv sync
+
+# Activate virtual environment (if using uv)
+source .venv/bin/activate
+
+# Alternative: Traditional setup
 python3 -m venv venv
-
-# Activate virtual environment
 source venv/bin/activate  
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
@@ -43,17 +45,27 @@ pip install -r requirements.txt
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REDIS_HOST` | Redis server hostname | localhost |
-| `REDIS_PORT` | Redis server port | 6379 |
-| `REDIS_PASSWORD` | Redis password | None |
 | `NEAR_ACCOUNT` | NEAR account for minting NFTs | None (required) |
 | `NEAR_ENV` | NEAR network (testnet/mainnet) | testnet |
-| `ETRAP_S3_BUCKET` | S3 bucket for batch storage | etrap-{org_id} |
+| `REDIS_HOST` | Redis server hostname | localhost |
+| `REDIS_PORT` | Redis server port | 6379 |
+| `REDIS_PASSWORD` | Redis password | None (optional) |
+| `ETRAP_S3_BUCKET` | S3 bucket for batch storage | etrap-demo |
 | `ETRAP_ORG_ID` | Organization identifier | demo-org |
-| `AWS_ACCESS_KEY_ID` | AWS credentials | None |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials | None |
+| `AWS_ACCESS_KEY_ID` | AWS access key for S3 | None (optional) |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key for S3 | None (optional) |
 | `AWS_DEFAULT_REGION` | AWS region | us-west-2 |
 
+Example:
+```bash
+export AWS_DEFAULT_REGION="us-west-2"
+export AWS_ACCESS_KEY_ID="AK.."
+export AWS_SECRET_ACCESS_KEY="OrH.."
+export ETRAP_ORG_ID="acme"
+export ETRAP_S3_BUCKET="etrap-acme"
+export NEAR_ACCOUNT="acme.testnet"
+export NEAR_ENV="testnet" 
+```
 ### Batching Parameters
 
 The agent uses intelligent batching with these configurable parameters:
@@ -67,8 +79,12 @@ force_batch_after = 300  # Force batch creation after 5 minutes
 
 ## Data Structures
 
-### Batch Reference Data (S3)
-
+### Batch Reference Metadata (S3)
+ The `batch-data.json`file
+  contains the complete batch metadata including batch info, detailed transaction records with their
+  hashes and Merkle leaf positions, the full Merkle tree structure with proof paths, search indices
+  organized by timestamp/operation/date, and compliance/verification data - essentially everything needed
+   to cryptographically verify any individual transaction within that batch.
 ```json
 {
   "batch_info": {
@@ -109,6 +125,22 @@ force_batch_after = 300  # Force batch creation after 5 minutes
   }
 }
 ```
+
+### Additional Metadata Files (S3)
+- `merkle-tree.json`: Contains the standalone Merkle tree structure with algorithm, root hash, all nodes
+  with their levels and indices, and complete proof paths for cryptographic verification of individual
+  transactions.
+
+- `indices` files: Contain optimized lookup tables that map timestamps, operation types, and dates to their
+   corresponding transaction IDs for fast searching and filtering within the batch.
+
+The Merkle tree data exists in BOTH files:
+  - `batch-data.json` contains the complete Merkle tree (embedded)
+  - `merkle-tree.json` contains the same Merkle tree data (standalone)
+
+>This redundancy means verification tools can use either file - the complete `batch-data.json` or just the
+`merkle-tree.json` depending on their needs.
+
 
 ### NFT Metadata (NEAR)
 
@@ -195,6 +227,21 @@ bucket/
 │               └── by_date.json
 ```
 
+Example:
+- bucket: etrap-lunaris - always etrap-{organization_id}
+- database: etrapdb
+- table: financial_transactions
+- BATCH-2025-06-26-17b79479-T1
+```
+$ aws s3 ls s3://etrap-lunaris/etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/ --recursive
+2025-06-26 11:08:22    2189021 etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/batch-data.json
+2025-06-26 11:08:22      34434 etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/indices/by_date.json
+2025-06-26 11:08:22      34432 etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/indices/by_operation.json
+2025-06-26 11:08:22      34637 etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/indices/by_timestamp.json
+2025-06-26 11:08:22    1158479 etrapdb/financial_transactions/BATCH-2025-06-26-17b79479-T1/merkle-tree.json
+
+```
+
 ## Error Handling
 
 - **Redis Connection**: Automatic reconnection with backoff
@@ -254,11 +301,6 @@ export ETRAP_DEBUG=true
 
 ## Development
 
-### Running Tests
-
-```bash
-python -m pytest tests/
-```
 
 ### Code Structure
 
@@ -331,4 +373,9 @@ Configure logrotate for agent logs:
 
 ---
 
-For more information, see the main [README](README.md) or the [Transaction Verifier Guide](README_etrap_verify.md).
+For more information, see the main [README](../README.md).
+
+
+## Copyright
+
+Copyright (c) 2025 Graziano Labs Corp. All rights reserved.
