@@ -7,6 +7,8 @@ creating a tamper-proof audit trail for regulatory compliance and data integrity
 
 The platform consists of four main components operating in a secure pipeline: first, PostgreSQL database changes are captured by Debezium CDC (Change Data Capture) and streamed through Redis, all running on-premises within the customer's infrastructure. The ETRAP CDC Agent then consumes these events, strips all sensitive data, creates cryptographic hashes, and builds Merkle trees from batches of transactions. Only these hashes and metadata are sent externally to AWS S3 for detailed storage and to the NEAR blockchain where they're minted as NFTs, creating an immutable timestamp and proof of existence. 
 
+> *Origin of the name. The Greek word "έτραπ" (etrap) is the strong aorist active form of the verb "τρέπω" (trepo) meaning "to turn" or "to change direction" - which is quite fitting for a platform that tracks database changes and transformations.*
+
 ## 🏗️ Architecture
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌─────────────────────────┐
@@ -16,14 +18,14 @@ The platform consists of four main components operating in a secure pipeline: fi
 └──────────────┘     └──────────────┘     └──────────────┘     │  - Batch Metadata       │
                                                                └────────────┬────────────┘
                                                                             │ 
-                                                   ┌────────────────────────┴────────────────────┐
-                                                   ▼                                             ▼
-                                         ┌────────────────────┐                        ┌────────────────────┐
-                                         │    AWS S3          │                        │   NEAR Blockchain  │
-                                         │  - Hashes          │                        │  - NFT Token       │
-                                         │  - Merkle Tree     │                        │  - Merkle Root     │
-                                         │  - Metadata        │                        │  - Timestamp       │
-                                         └────────────────────┘                        └────────────────────┘
+                              ┌─────────────────────────────────────────────┤
+                              ▼                                             ▼
+                     ┌────────────────────┐                        ┌────────────────────┐
+                     │    AWS S3          │                        │   NEAR Blockchain  │
+                     │  - Hashes          │                        │  - NFT Token       │
+                     │  - Merkle Tree     │                        │  - Merkle Root     │
+                     │  - Metadata        │                        │  - Timestamp       │
+                     └────────────────────┘                        └────────────────────┘
 ```
 This hybrid architecture ensures complete data sovereignty—no actual transaction data ever leaves the customer's premises—while still providing court-admissible blockchain proof of data integrity, making it ideal for regulatory compliance in financial services, healthcare, and government sectors where data privacy is paramount.
 
@@ -39,7 +41,6 @@ This hybrid architecture ensures complete data sovereignty—no actual transacti
 - **CLI for Verification**: Simple and intuitive interface for verifying transactions
 - **Python SDK**: Python SDK for ETRAP with integration examples
 
-> *Origin of the name. The Greek word "έτραπ" (etrap) is the strong aorist active form of the verb "τρέπω" (trepo) meaning "to turn" or "to change direction" - which is quite fitting for a platform that tracks database changes and transformations.*
 
 ## 📋 Components in this repo
 
@@ -77,8 +78,8 @@ Captures database changes and creates blockchain-backed audit trails:
 ## ETRAP Repos
 Other relevant repos are:
 
-[ETRAP NEAR Smart Contract](https://github.com/marcoeg/etrap-notary)
-[ETRAP Python SDK (includes verification CLI)](https://github.com/marcoeg/etrap-sdk)
+- [ETRAP NEAR Smart Contract](https://github.com/marcoeg/etrap-notary)
+- [ETRAP Python SDK (includes verification CLI)](https://github.com/marcoeg/etrap-sdk)
 
 ## 🛠️ Installation
 
@@ -86,10 +87,9 @@ Other relevant repos are:
 
 The complete ETRAP deployment workflow is:
 
-  1. PostgreSQL Setup: `./docker/setup-postgresql.sh` (configure CDC)
-  2. NEAR Onboarding: `./onboard_organization.sh` (create NEARaccount/deploy smart contract)
-  3. Docker Generation: `./generate_etrap_docker.sh` (create containers)
-  4. Deployment: `docker-compose up -d `(run services)
+  1. NEAR Onboarding: `./onboard_organization.sh` (create NEAR account/deploy smart contract)
+  2. Docker Generation: `./generate_etrap_docker.sh` (configure CDC/create containers)
+  3. Deployment: `docker-compose up -d `(run services)
 
 - [Onboarding a new organization](./onboarding.md)
 - [Generating and run ETRAP docker containers](./docker/README.md)
@@ -115,7 +115,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🪪 License
 
-MIT. See `./LICENSE`.
+MIT. See `./LICENSE`
 
 
 ## 📄 Copyright
