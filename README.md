@@ -1,21 +1,33 @@
 # ETRAP
-ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based service that creates immutable "receipts" for enterprise database transactions, providing proof of integrity, non-repudiation, and regulatory compliance.
 
-ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based audit trail system
-that captures database changes and creates immutable proofs on the NEAR blockchain. The system
-combines the reliability of traditional databases with the immutability of blockchain technology,
-creating a tamper-proof audit trail for regulatory compliance and data integrity verification.
+ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based audit trail platform 
+that captures database changes and creates immutable proofs on the NEAR blockchain. The platform 
+combines the reliability of traditional databases with the immutability of blockchain technology, 
+creating a tamper-proof audit trail for regulatory compliance and data integrity verification
 
-The pipeline consists of six key stages:
-1. Database changes captured by PostgreSQL (on-premises)
-2. Change Data Capture (CDC) via Debezium (on-premises)
-3. Event streaming through Redis (on-premises)
-4. Intelligent batching by the ETRAP CDC Agent (on-premises)
-5. Metadata and hash storage in AWS S3 (cloud - no sensitive data)
-6. Immutable hash anchoring NFT on NEAR blockchain (public - no sensitive data)
+The platform consists of four main components operating in a secure pipeline: first, PostgreSQL database changes are captured by Debezium CDC (Change Data Capture) and streamed through Redis, all running on-premises within the customer's infrastructure. The ETRAP CDC Agent then consumes these events, strips all sensitive data, creates cryptographic hashes, and builds Merkle trees from batches of transactions. Only these hashes and metadata are sent externally to AWS S3 for detailed storage and to the NEAR blockchain where they're minted as NFTs, creating an immutable timestamp and proof of existence. 
 
+## 🏗️ Architecture
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌─────────────────────────┐
+│  PostgreSQL  │ ──> │  Debezium    │ ──> │    Redis     │ ──> │   ETRAP CDC AGENT       │
+│  Database    │     │     CDC      │     │   Streams    │     │  - Hashing              │
+│  (On-Prem)   │     │  (On-Prem)   │     │  (On-Prem)   │     │  - Merkle Tree          │
+└──────────────┘     └──────────────┘     └──────────────┘     │  - Batch Metadata       │
+                                                               └────────────┬────────────┘
+                                                                            │ 
+                                                   ┌────────────────────────┴────────────────────┐
+                                                   ▼                                             ▼
+                                         ┌────────────────────┐                        ┌────────────────────┐
+                                         │    AWS S3          │                        │   NEAR Blockchain  │
+                                         │  - Hashes          │                        │  - NFT Token       │
+                                         │  - Merkle Tree     │                        │  - Merkle Root     │
+                                         │  - Metadata        │                        │  - Timestamp       │
+                                         └────────────────────┘                        └────────────────────┘
+```
+This hybrid architecture ensures complete data sovereignty—no actual transaction data ever leaves the customer's premises—while still providing court-admissible blockchain proof of data integrity, making it ideal for regulatory compliance in financial services, healthcare, and government sectors where data privacy is paramount.
 
-## Key Features
+## ✨Key Features
 
 - **Real-time CDC**: Captures all database changes via Debezium/Redis
 - **Blockchain Anchoring**: Creates NFTs on NEAR blockchain with Merkle roots
@@ -27,75 +39,61 @@ The pipeline consists of six key stages:
 - **CLI for Verification**: Simple and intuitive interface for verifying transactions
 - **Python SDK**: Python SDK for ETRAP with integration examples
 
-
-Critical Privacy Feature: No actual transaction data ever leaves the customer's premises. Only
-cryptographic hashes and metadata are stored externally (S3 and blockchain), ensuring complete data
-sovereignty and compliance with the strictest privacy regulations.
+> *Origin of the name. The Greek word "έτραπ" (etrap) is the strong aorist active form of the verb "τρέπω" (trepo) meaning "to turn" or "to change direction" - which is quite fitting for a platform that tracks database changes and transformations.*
 
 ## 📋 Components in this repo
 
-### 1. CDC Agent (`etrap_cdc_agent.py`) - Enterprise Transaction Recording and Audit Platform
+### 1. Infrastructure 
 
+Each customer organization gets their own containerized deployment that includes:
+- **Debezium Server** - Captures PostgreSQL database changes via CDC
+- **Redis Server** - Streams CDC events for processing
+- **ETRAP CDC Agent** - Processes events and creates blockchain proofs on NEAR Protocol 
+
+The containerized infrastructure reference deployment is in the `./docker` directory of this repo. 
+
+[Generating ETRAP docker containers](./docker/README.md)
+
+>The reference infrastructure is based on PostgreSQL. Since Debezium can capture changes in a variety of databases, it
+can easily adapted to other databases.
+
+### 2. ETRAP CDC Agent 
 
 A production-ready Change Data Capture (CDC) agent that creates immutable audit trails on the NEAR blockchain, providing cryptographic proof of database transactions for regulatory compliance and legal proceedings.
+
+Python code is in the `cdc-agent` directory.
 
 Captures database changes and creates blockchain-backed audit trails:
 - Consumes CDC events from Redis streams
 - Intelligent batching for efficiency
 - Merkle tree generation
-- S3 storage for detailed data
+- S3 storage for metadata
 - NFT minting on NEAR
 
-> Transaction verification is done using the `etrap-sdk` in 
+[ETRAP CDC Agent Documentation](./cdc-agent/README_CDC.md)
 
+> Verification of transactions may be done with the read-only `etrap_verify_sdk.py` utility in the ETRAP [Python SDK repo](https://github.com/marcoeg/etrap-sdk). 
+
+## ETRAP Repos
+Other relevant repos are:
+
+[ETRAP NEAR Smart Contract](https://github.com/marcoeg/etrap-notary)
+[ETRAP Python SDK (includes verification CLI)](https://github.com/marcoeg/etrap-sdk)
 
 ## 🛠️ Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/marcoeg/etrap.git
-cd etrap
-```
 ## Workflow
 
-The complete ETRAP deployment workflow is now:
+The complete ETRAP deployment workflow is:
 
-  1. PostgreSQL Setup: ./docker/setup-postgresql.sh (configure CDC)
-  2. NEAR Onboarding: ./onboard_organization.sh (create account/contract)
-  3. Docker Generation: ./generate_etrap_docker.sh (create containers)
-  4. Deployment: docker-compose up -d (run services)
+  1. PostgreSQL Setup: `./docker/setup-postgresql.sh` (configure CDC)
+  2. NEAR Onboarding: `./onboard_organization.sh` (create NEARaccount/deploy smart contract)
+  3. Docker Generation: `./generate_etrap_docker.sh` (create containers)
+  4. Deployment: `docker-compose up -d `(run services)
 
+- [Onboarding a new organization](./onboarding.md)
+- [Generating and run ETRAP docker containers](./docker/README.md)
 
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-```bash
-# NEAR Configuration
-export NEAR_ACCOUNT=your-account.testnet
-export NEAR_ENV=testnet
-
-# AWS Configuration
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-export AWS_DEFAULT_REGION=us-east-1
-
-# ETRAP Configuration
-export ETRAP_S3_BUCKET=etrap-your-org
-export ETRAP_ORG_ID=your-org
-```
-
-
-## 📊 Architecture
-
-```
-PostgreSQL → Debezium → Redis → CDC Agent → S3 & NEAR Blockchain
-                                     ↓
-                              Transaction Verifier
-                                     ↓
-                              Audit Reports
-```
 
 ## 🔒 Security
 
@@ -114,34 +112,19 @@ PostgreSQL → Debezium → Redis → CDC Agent → S3 & NEAR Blockchain
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+
+## 🪪 License
+
+MIT. See `./LICENSE`.
+
+
 ## 📄 Copyright
-
-
-This project is proprietary.
 
 Copyright (c) 2025 Graziano Labs Corp. All rights reserved.
 
-
-## 🏢 Use Cases
-
-- Financial transaction auditing
-- Regulatory compliance (SOX, GDPR)
-- Legal dispute resolution
-- Access control auditing
-- Data integrity verification
-
-## 🚧 Future Enhancements
-
-- PDF report generation
-- Real-time alerting
-- Multi-database federation
-- UPDATE/DELETE operation tracking
-- Web-based verification portal
 
 ## 📧 Contact
 
 For questions or support, please open an issue in the GitHub repository.
 
 ---
-
-Built with ❤️ for enterprise compliance and transparency
