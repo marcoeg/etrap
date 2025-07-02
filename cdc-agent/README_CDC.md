@@ -9,13 +9,6 @@ The ETRAP CDC Agent is the core component that captures database changes and cre
 
 ### Setup and Installation
 ```bash
-# Install dependencies using uv
-uv sync
-
-# Activate virtual environment (if using uv)
-source .venv/bin/activate
-
-# Alternative: Traditional setup
 python3 -m venv venv
 source venv/bin/activate  
 pip install -r requirements.txt

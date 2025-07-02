@@ -41,6 +41,7 @@ This hybrid architecture ensures complete data sovereignty—no actual transacti
 - **CLI for Verification**: Simple and intuitive interface for verifying transactions
 - **Python SDK**: Python SDK for ETRAP with integration examples
 
+For detailed design documentation check the [ETRAP Design Document](etrap-design-document.md)
 
 ## 📋 Components in this repo
 
