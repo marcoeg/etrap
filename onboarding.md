@@ -1,6 +1,13 @@
 # Onboarding of a New Organization
 
-Required:
+This guide covers the NEAR blockchain setup for a new organization. This is one of two prerequisites for ETRAP deployment:
+
+- **PostgreSQL Setup** - Database configuration (can be done in parallel)
+- **NEAR Onboarding** - This guide
+- **Docker Generation** - Requires both above to be complete
+
+## Requirements
+
 - organization name
 - organization id
 

@@ -84,16 +84,51 @@ Other relevant repos are:
 
 ## 🛠️ Installation
 
-## Workflow
+### Complete Setup Process
 
-The complete ETRAP deployment workflow is:
+The ETRAP deployment requires completing these components:
 
-  1. NEAR Onboarding: `./onboard_organization.sh` (create NEAR account/deploy smart contract)
-  2. Docker Generation: `./generate_etrap_docker.sh` (configure CDC/create containers)
-  3. Deployment: `docker-compose up -d `(run services)
+**Prerequisites (can be done in parallel):**
+1. **PostgreSQL Setup** - Configure database for Change Data Capture (CDC)
+2. **NEAR Setup** - Deploy blockchain components
 
-- [Onboarding a new organization](./onboarding.md)
-- [Generating and run ETRAP docker containers](./docker/README.md)
+**Final Step (requires both prerequisites):**
+3. **Docker Setup** - Generate and deploy containers
+
+All commands should be run from the main ETRAP directory:
+
+```bash
+# 1. PostgreSQL Setup (database team can do this)
+./docker/setup-postgresql.sh \
+  --database etrapdb \
+  --debezium-user debezium \
+  --debezium-password your_secure_password \
+  --execute
+
+# 2. NEAR Setup (blockchain team can do this in parallel)
+./onboard_organization.sh \
+  --organization-name "Your Organization" \
+  --organization-id "yourorg" \
+  --near-network testnet
+
+# 3. Docker Generation (requires steps 1 & 2 complete)
+./generate_etrap_docker.sh \
+  --organization-name "Your Organization" \
+  --organization-id "yourorg" \
+  --postgres-host "your-db-host" \
+  --postgres-database "etrapdb" \
+  --postgres-username "debezium" \
+  --postgres-password "your_secure_password" \
+  --near-network "testnet" \
+  --aws-access-key-id "AKIA..." \
+  --aws-secret-access-key "xyz..."
+```
+
+### Detailed Documentation
+
+- [PostgreSQL Setup Guide](./docker/README.md#postgresql-setup) - Database configuration for CDC
+- [NEAR Onboarding Guide](./onboarding.md) - Blockchain account and smart contract deployment
+- [Docker Container Guide](./docker/README.md) - Container generation and deployment
 
 
 ## 🔒 Security

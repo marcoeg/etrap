@@ -12,11 +12,23 @@ ETRAP provides tamper-proof digital receipts for enterprise database transaction
 
 ## Prerequisites
 
-Before generating a Docker container for a customer organization:
+Before generating a Docker container for a customer organization, ensure you have:
 
-1. **NEAR Account Setup**: Run `onboard_organization.sh` to create the NEAR account and deploy the smart contract
-2. **PostgreSQL Configuration**: Set up PostgreSQL with Debezium replication slot and publication (see [PostgreSQL Setup](#postgresql-setup) below)
-3. **AWS S3 Access**: Ensure S3 credentials have permissions to create buckets and store objects
+1. **PostgreSQL Configuration**
+   - Database configured for CDC with logical replication
+   - Debezium user created with proper permissions
+   - See [PostgreSQL Setup](#postgresql-setup) section below
+
+2. **NEAR Account Setup**
+   - Organization's NEAR account created
+   - ETRAP smart contract deployed and initialized
+   - See [NEAR Onboarding Guide](../onboarding.md)
+
+3. **AWS S3 Access**
+   - S3 credentials with permissions to create buckets and store objects
+   - Required for storing Merkle trees and batch metadata
+
+> 📝 **Note**: PostgreSQL setup and NEAR onboarding can be done in parallel by different teams. Both must be complete before generating Docker containers.
 
 ### PostgreSQL Setup
 
@@ -139,9 +151,58 @@ psql -h your_host -p 5432 -U debezium -d etrapdb -c "SELECT 1;"
 psql -h your_host -p 5432 -U debezium -d etrapdb -c "SELECT pg_is_in_recovery();"
 ```
 
-## Quick Start
+## Complete Setup Workflow
 
-### 1. Generate Container for an Organization
+The ETRAP platform setup workflow:
+
+```mermaid
+graph TB
+    A[PostgreSQL Setup] --> C[Docker Generation]
+    B[NEAR Onboarding] --> C
+    C --> D[Container Deployment]
+```
+
+### Prerequisites (Can be done in parallel)
+
+#### PostgreSQL Setup
+
+From the main ETRAP directory, run:
+
+```bash
+./docker/setup-postgresql.sh \
+  --database etrapdb \
+  --debezium-user debezium \
+  --debezium-password secure_password \
+  --execute
+```
+
+This creates:
+- Debezium user with replication privileges
+- Replication slot `etrap_debezium_slot`
+- Publication `etrap_publication`
+- Proper permissions and configurations
+
+#### NEAR Account Setup
+
+From the main ETRAP directory, run:
+
+```bash
+./onboard_organization.sh \
+  --organization-name "Vantage Corp" \
+  --organization-id "vantage" \
+  --near-network testnet
+```
+
+This creates:
+- NEAR account (e.g., `vantage.testnet`)
+- Deploys ETRAP smart contract
+- Initializes contract with organization details
+
+### Docker Container Generation
+
+After both PostgreSQL and NEAR are configured, generate the Docker containers.
+
+From the main ETRAP directory, run:
 
 ```bash
 ./generate_etrap_docker.sh \
@@ -156,14 +217,18 @@ psql -h your_host -p 5432 -U debezium -d etrapdb -c "SELECT pg_is_in_recovery();
   --aws-secret-access-key "xyz..."
 ```
 
-### 2. Deploy the Container
+This generates a complete Docker deployment in `docker/etrap-vantage/`
+
+### Container Deployment
+
+Deploy the generated containers:
 
 ```bash
 cd docker/etrap-vantage
 docker-compose up -d
 ```
 
-### 3. Monitor the Deployment
+Monitor the deployment:
 
 ```bash
 # Check container status
