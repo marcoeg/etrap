@@ -443,7 +443,7 @@ class ETRAPCDCAgent:
             if self.near_client:
                 # Convert to contract format
                 batch_summary = self.create_batch_summary_for_contract(batch_data, database, table)
-                token_metadata = self.create_token_metadata_for_contract(batch_id, table, len(events))
+                token_metadata = self.create_token_metadata_for_contract(batch_id, database, table, len(events))
                 
                 # Mint NFT with retry
                 blockchain_data = self.mint_nft_with_retry(
@@ -510,7 +510,7 @@ class ETRAPCDCAgent:
             'operation_counts': ops_summary
         }
     
-    def create_token_metadata_for_contract(self, batch_id: str, table: str, event_count: int) -> Dict:
+    def create_token_metadata_for_contract(self, batch_id: str, database: str, table: str, event_count: int) -> Dict:
         """Create TokenMetadata for the NFT"""
         return {
             'title': f"ETRAP Batch {batch_id}",
@@ -523,7 +523,7 @@ class ETRAPCDCAgent:
             'starts_at': None,
             'updated_at': None,
             'extra': None,
-            'reference': f"https://s3.amazonaws.com/{self.s3_bucket}/{batch_id}/batch-data.json",
+            'reference': f"https://s3.amazonaws.com/{self.s3_bucket}/{database}/{table}/{batch_id}/batch-data.json",
             'reference_hash': None
         }
     
@@ -771,23 +771,38 @@ class ETRAPCDCAgent:
         if not leaf_hashes:
             return None
         
+        # Pad to next power of 2 for consistent tree structure
+        import math
+        original_count = len(leaf_hashes)
+        next_power = 2 ** math.ceil(math.log2(len(leaf_hashes))) if len(leaf_hashes) > 1 else 1
+        
+        # Pad with deterministic padding hashes to reach next power of 2
+        padded_hashes = leaf_hashes[:]
+        padding_base = leaf_hashes[-1] if leaf_hashes else "0" * 64
+        while len(padded_hashes) < next_power:
+            # Create unique padding hash by appending padding index
+            padding_hash = hashlib.sha256(f"{padding_base}-pad-{len(padded_hashes)}".encode()).hexdigest()
+            padded_hashes.append(padding_hash)
+        
         # Initialize tree structure
         nodes = []
         proof_index = {}
         
-        # Create leaf nodes
+        # Create leaf nodes for padded hashes
         current_level = []
-        for idx, leaf_hash in enumerate(leaf_hashes):
+        for idx, leaf_hash in enumerate(padded_hashes):
             node = {
                 'index': len(nodes),
                 'hash': leaf_hash,
-                'level': 0
+                'level': 0,
+                'is_original': idx < original_count  # Track original vs padded
             }
             nodes.append(node)
             current_level.append(node)
-            
-            # Initialize proof path for this leaf
-            tx_id = f"tx-{idx}"  # Simplified transaction ID
+        
+        # Initialize proof paths only for original leaves
+        for idx in range(original_count):
+            tx_id = f"tx-{idx}"
             proof_index[tx_id] = {
                 'leaf_index': idx,
                 'proof_path': [],
@@ -803,7 +818,7 @@ class ETRAPCDCAgent:
             
             for i in range(0, len(current_level), 2):
                 left = current_level[i]
-                right = current_level[i + 1] if i + 1 < len(current_level) else left
+                right = current_level[i + 1]  # Now guaranteed to exist due to padding
                 
                 # Create parent node
                 parent_hash = hashlib.sha256(
@@ -825,8 +840,8 @@ class ETRAPCDCAgent:
             current_level = next_level
             level += 1
         
-        # Build proof paths
-        for tx_idx in range(len(leaf_hashes)):
+        # Build proof paths for original transactions only
+        for tx_idx in range(original_count):
             proof_path = []
             sibling_positions = []
             
@@ -840,9 +855,9 @@ class ETRAPCDCAgent:
                     sibling_idx = current_idx - 1
                     sibling_pos = 'left'
                 
-                if sibling_idx < len(level_nodes):
-                    proof_path.append(level_nodes[sibling_idx]['hash'])
-                    sibling_positions.append(sibling_pos)
+                # Sibling is guaranteed to exist due to padding
+                proof_path.append(level_nodes[sibling_idx]['hash'])
+                sibling_positions.append(sibling_pos)
                 
                 current_idx = current_idx // 2
             
@@ -855,7 +870,9 @@ class ETRAPCDCAgent:
             'root': nodes[-1]['hash'] if nodes else '',
             'height': level,
             'nodes': nodes,
-            'proof_index': proof_index
+            'proof_index': proof_index,
+            'original_count': original_count,
+            'padded_count': len(padded_hashes)
         }
     
     def store_batch_in_s3(self, database: str, batch_id: str, table: str, batch_data: Dict) -> bool:
