@@ -117,12 +117,18 @@ class ETRAPCDCAgent:
     def init_near_client(self):
         """Initialize NEAR client using credentials from ~/.near-credentials/"""
         try:
-            # Setup provider
-            if self.near_network == 'mainnet':
-                rpc_url = "https://rpc.mainnet.near.org"
-            else:
-                rpc_url = "https://rpc.testnet.near.org"
+            # Check for custom RPC endpoint from environment
+            rpc_url = os.getenv('ETRAP_RPC_ENDPOINT')
             
+            if not rpc_url:
+                # Use default endpoints based on network
+                if self.near_network == 'mainnet':
+                    rpc_url = "https://rpc.mainnet.near.org"
+                else:
+                    # Use FastNear for testnet (higher rate limits)
+                    rpc_url = "https://test.rpc.fastnear.com"
+            
+            print(f"🌐 Using RPC endpoint: {rpc_url}")
             self.near_provider = JsonProvider(rpc_url)
             
             # Load credentials from ~/.near-credentials/

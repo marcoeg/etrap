@@ -40,6 +40,7 @@ pip install -r requirements.txt
 |----------|-------------|---------|
 | `NEAR_ACCOUNT` | NEAR account for minting NFTs | None (required) |
 | `NEAR_ENV` | NEAR network (testnet/mainnet) | testnet |
+| `ETRAP_RPC_ENDPOINT` | Custom NEAR RPC endpoint | testnet: https://test.rpc.fastnear.com, mainnet: https://rpc.mainnet.near.org |
 | `REDIS_HOST` | Redis server hostname | localhost |
 | `REDIS_PORT` | Redis server port | 6379 |
 | `REDIS_PASSWORD` | Redis password | None (optional) |
