@@ -98,11 +98,13 @@ The ETRAP deployment requires completing these components:
 All commands should be run from the main ETRAP directory:
 
 ```bash
-# 1. PostgreSQL Setup (database team can do this)
+# 1. PostgreSQL Setup
 ./docker/setup-postgresql.sh \
   --database etrapdb \
   --debezium-user debezium \
   --debezium-password your_secure_password \
+  --postgres-host db_ip_address \
+  --postgres-port dp_port \
   --execute
 
 # 2. NEAR Setup (blockchain team can do this in parallel)

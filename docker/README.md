@@ -44,14 +44,43 @@ Use the provided setup script for automated configuration:
   --database etrapdb \
   --debezium-user debezium \
   --debezium-password your_secure_password \
+  --postgres-host db_ip_address \
+  --postgres-port dp_port \
   --execute
-
+  
 # Or generate SQL script only (for review/manual execution)
 ./docker/setup-postgresql.sh \
   --database etrapdb \
   --debezium-user debezium \
   --debezium-password your_secure_password
 ```
+
+#### Executing Generated SQL Script Manually
+
+If the `--execute` option fails due to permission issues (e.g., no postgres password), you can manually execute the generated SQL:
+
+1. **Copy the generated SQL file to your PostgreSQL server:**
+   ```bash
+   scp setup-postgresql.sql ubuntu@your-postgres-server:~/
+   ```
+
+2. **SSH into your PostgreSQL server and execute the script:**
+   ```bash
+   # Copy to a location accessible by postgres user
+   sudo cp ~/setup-postgresql.sql /tmp/
+   sudo chmod 644 /tmp/setup-postgresql.sql
+   
+   # Execute as postgres superuser
+   sudo -u postgres psql -d your_database -f /tmp/setup-postgresql.sql
+   ```
+
+3. **Expected output:**
+   - User `debezium` created with replication privileges
+   - Replication slot `etrap_debezium_slot` created
+   - Publication `etrap_publication` created for all tables
+   - Permissions granted and REPLICA IDENTITY configured
+
+The script will show verification steps and confirm successful setup completion.
 
 #### Manual Setup Steps
 
