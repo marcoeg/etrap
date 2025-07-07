@@ -14,17 +14,22 @@ ETRAP provides tamper-proof digital receipts for enterprise database transaction
 
 Before generating a Docker container for a customer organization, ensure you have:
 
-1. **PostgreSQL Configuration**
+1. **Docker Compose v2**
+   - Docker Compose v2 is required (uses `docker compose` command)
+   - Verify with: `docker compose version`
+   - If you have v1 (`docker-compose`), please upgrade to v2
+
+2. **PostgreSQL Configuration**
    - Database configured for CDC with logical replication
    - Debezium user created with proper permissions
    - See [PostgreSQL Setup](#postgresql-setup) section below
 
-2. **NEAR Account Setup**
+3. **NEAR Account Setup**
    - Organization's NEAR account created
    - ETRAP smart contract deployed and initialized
    - See [NEAR Onboarding Guide](../onboarding.md)
 
-3. **AWS S3 Access**
+4. **AWS S3 Access**
    - S3 credentials with permissions to create buckets and store objects
    - Required for storing Merkle trees and batch metadata
 
@@ -254,20 +259,20 @@ Deploy the generated containers:
 
 ```bash
 cd docker/etrap-vantage
-docker-compose up -d
+docker compose up -d
 ```
 
 Monitor the deployment:
 
 ```bash
 # Check container status
-docker-compose ps
+docker compose ps
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Run health checks
-docker-compose exec etrap-agent /app/scripts/health-check.sh all
+docker compose exec etrap-agent /app/scripts/health-check.sh all
 ```
 
 ## Generated Structure
@@ -347,30 +352,30 @@ PostgreSQL DB → Debezium → Redis Streams → ETRAP Agent → NEAR Blockchain
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Stop all services  
-docker-compose down
+docker compose down
 
 # Restart specific service
-docker-compose restart etrap-agent
+docker compose restart etrap-agent
 
 # View service logs
-docker-compose logs -f redis
-docker-compose logs -f debezium
-docker-compose logs -f etrap-agent
+docker compose logs -f redis
+docker compose logs -f debezium
+docker compose logs -f etrap-agent
 ```
 
 ### Health Monitoring
 
 ```bash
 # Check all services
-docker-compose exec etrap-agent /app/scripts/health-check.sh all
+docker compose exec etrap-agent /app/scripts/health-check.sh all
 
 # Check individual services
-docker-compose exec etrap-agent /app/scripts/health-check.sh redis
-docker-compose exec etrap-agent /app/scripts/health-check.sh debezium
-docker-compose exec etrap-agent /app/scripts/health-check.sh agent
+docker compose exec etrap-agent /app/scripts/health-check.sh redis
+docker compose exec etrap-agent /app/scripts/health-check.sh debezium
+docker compose exec etrap-agent /app/scripts/health-check.sh agent
 ```
 
 ### Troubleshooting
@@ -380,34 +385,34 @@ docker-compose exec etrap-agent /app/scripts/health-check.sh agent
 1. **Debezium Connection Errors**
    ```bash
    # Check PostgreSQL connectivity
-   docker-compose exec debezium /app/scripts/health-check.sh debezium
+   docker compose exec debezium /app/scripts/health-check.sh debezium
    
    # Verify replication slot
-   docker-compose logs debezium | grep "slot\|publication"
+   docker compose logs debezium | grep "slot\|publication"
    ```
 
 2. **NEAR Credential Issues**
    ```bash
    # Verify credential file
-   docker-compose exec etrap-agent cat /root/.near-credentials/testnet/vantage.testnet.json
+   docker compose exec etrap-agent cat /root/.near-credentials/testnet/vantage.testnet.json
    
    # Check NEAR connectivity
-   docker-compose exec etrap-agent near view vantage.testnet get_organization_info
+   docker compose exec etrap-agent near view vantage.testnet get_organization_info
    ```
 
 3. **Redis Stream Issues**
    ```bash
    # Monitor Redis streams
-   docker-compose exec redis redis-cli XINFO GROUPS etrap.public.*
+   docker compose exec redis redis-cli XINFO GROUPS etrap.public.*
    
    # Check stream contents
-   docker-compose exec redis redis-cli XREAD STREAMS etrap.public.financial_transactions 0-0
+   docker compose exec redis redis-cli XREAD STREAMS etrap.public.financial_transactions 0-0
    ```
 
 4. **S3 Access Issues**
    ```bash
    # Test S3 connectivity
-   docker-compose exec etrap-agent python -c "import boto3; print(boto3.client('s3').list_buckets())"
+   docker compose exec etrap-agent python -c "import boto3; print(boto3.client('s3').list_buckets())"
    ```
 
 ## Security Considerations
@@ -443,7 +448,7 @@ Each generated container is independent and can be customized:
 
 1. Modify configuration files in `config/`
 2. Update environment variables in `.env`
-3. Restart services with `docker-compose up -d`
+3. Restart services with `docker compose up -d`
 
 ## Integration with ETRAP Workflow
 
@@ -510,6 +515,6 @@ When you run `setup-postgresql.sh`, it generates:
 For deployment issues:
 
 1. Check the generated `DEPLOY.md` file for organization-specific instructions
-2. Review health check logs: `docker-compose exec etrap-agent /app/scripts/health-check.sh all`
-3. Examine service logs: `docker-compose logs -f [service_name]`
+2. Review health check logs: `docker compose exec etrap-agent /app/scripts/health-check.sh all`
+3. Examine service logs: `docker compose logs -f [service_name]`
 4. Verify external connectivity (PostgreSQL, NEAR, S3)

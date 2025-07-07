@@ -38,8 +38,14 @@ check_redis() {
 check_debezium() {
     log "Checking Debezium health..."
     
+    # Check if Debezium HTTP endpoint is responding
+    if ! curl -sf http://localhost:8080/q/health >/dev/null 2>&1; then
+        log "ERROR: Debezium health endpoint not responding"
+        return 1
+    fi
+    
     # Check if Debezium process is running
-    if ! pgrep -f "debezium-server" >/dev/null 2>&1; then
+    if ! pgrep -f "debezium" >/dev/null 2>&1; then
         log "ERROR: Debezium server process not found"
         return 1
     fi
@@ -47,14 +53,14 @@ check_debezium() {
     # Check if offset file exists and is being updated
     local offset_file="/app/data/offsets.dat"
     if [ ! -f "$offset_file" ]; then
-        log "WARNING: Debezium offset file not found (may be starting up)"
-        return 0  # Don't fail during startup
-    fi
-    
-    # Check if offset file has been updated recently (within last 5 minutes)
-    local file_age=$(( $(date +%s) - $(stat -c %Y "$offset_file" 2>/dev/null || echo 0) ))
-    if [ $file_age -gt 300 ]; then
-        log "WARNING: Debezium offset file is older than 5 minutes"
+        log "INFO: Debezium offset file not found (normal for fresh start or no CDC events)"
+        # Don't fail - this is normal for new deployments
+    else
+        # Check if offset file has been updated recently (within last 5 minutes)
+        local file_age=$(( $(date +%s) - $(stat -c %Y "$offset_file" 2>/dev/null || echo 0) ))
+        if [ $file_age -gt 300 ]; then
+            log "WARNING: Debezium offset file is older than 5 minutes (may indicate no recent CDC activity)"
+        fi
     fi
     
     log "Debezium health check: OK"

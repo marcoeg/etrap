@@ -73,7 +73,7 @@ class ETRAPCDCAgent:
         self.force_batch_after = 300        # Force batch creation after 5 minutes if events pending
         self.consumer_group = "etrap-agent"
         self.consumer_name = "agent-1"
-        self.stream_pattern = "etrap.public.*"
+        self.stream_pattern = "etrap.*"
         
         # State tracking for batching
         self.pending_events = []            # Events waiting to be batched

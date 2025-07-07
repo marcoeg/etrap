@@ -34,12 +34,22 @@ wait_for_redis() {
 # Function to wait for Debezium to be ready
 wait_for_debezium() {
     echo "Waiting for Debezium to be ready..."
-    local max_attempts=60
+    local max_attempts=12
     local attempt=0
     
+    # First check if Debezium HTTP endpoint is healthy
     while [ $attempt -lt $max_attempts ]; do
-        if [ -f "$DATA_DIR/offsets.dat" ] && [ -s "$DATA_DIR/offsets.dat" ]; then
-            echo "Debezium appears to be processing data!"
+        if curl -sf http://debezium:8080/q/health >/dev/null 2>&1; then
+            echo "Debezium HTTP endpoint is responding!"
+            
+            # Check if offset file exists (optional - may not exist until first CDC event)
+            if [ -f "$DATA_DIR/offsets.dat" ]; then
+                echo "Debezium offset file found"
+            else
+                echo "INFO: Debezium offset file not yet created (normal for fresh start)"
+            fi
+            
+            echo "Debezium is ready!"
             return 0
         fi
         echo "Debezium not ready, waiting... (attempt $((attempt + 1))/$max_attempts)"
@@ -47,7 +57,7 @@ wait_for_debezium() {
         ((attempt++))
     done
     
-    echo "WARNING: Debezium may not be ready, but continuing anyway..."
+    echo "WARNING: Debezium may not be ready after $max_attempts attempts, but continuing anyway..."
     return 0
 }
 
@@ -72,7 +82,7 @@ case "$SERVICE" in
         
         # Start Debezium Server
         cd /opt/debezium-server
-        exec java -jar lib/debezium-server-*-runner.jar
+        exec ./run.sh
         ;;
         
     "agent")

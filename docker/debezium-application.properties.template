@@ -13,7 +13,7 @@ debezium.source.topic.prefix=etrap
 debezium.source.plugin.name=pgoutput
 debezium.source.slot.name=etrap_debezium_slot
 debezium.source.publication.name=etrap_publication
-debezium.source.schema.include.list=public
+debezium.source.schema.include.list=public,${POSTGRES_DATABASE}
 debezium.source.snapshot.mode=never
 
 # Offset storage (file-based for simplicity)

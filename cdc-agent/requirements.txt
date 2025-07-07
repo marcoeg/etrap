@@ -1,4 +1,6 @@
 # ETRAP Transaction Validator Requirements
 py-near
+near-api-py
 boto3==1.34.95
 python-dotenv==1.0.1
+redis==5.0.1
