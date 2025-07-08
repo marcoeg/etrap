@@ -973,9 +973,9 @@ if __name__ == "__main__":
     print("-" * 60)
     
     # Check for required environment variables
-    if not os.getenv('NEAR_ACCOUNT'):
+    if not os.getenv('NEAR_ACCOUNT') and not os.getenv('NEAR_ACCOUNT_ID'):
         print("⚠️  Warning: NEAR_ACCOUNT not set. NFT minting will be disabled.")
-        print("   To enable NFT minting, set NEAR_ACCOUNT environment variable")
+        print("   To enable NFT minting, set NEAR_ACCOUNT or NEAR_ACCOUNT_ID environment variable")
     
     # Configure with your settings
     agent = ETRAPCDCAgent(
