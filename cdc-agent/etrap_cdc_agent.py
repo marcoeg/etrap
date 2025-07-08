@@ -67,8 +67,8 @@ class ETRAPCDCAgent:
         self.aws_region = aws_region
         
         # NEAR configuration
-        self.near_account = os.getenv('NEAR_ACCOUNT')
-        self.near_network = os.getenv('NEAR_ENV', 'testnet')
+        self.near_account = os.getenv('NEAR_ACCOUNT_ID') or os.getenv('NEAR_ACCOUNT')
+        self.near_network = os.getenv('NEAR_NETWORK') or os.getenv('NEAR_ENV', 'testnet')
         self.near_client = None
         self.near_provider = None
         self.max_mint_retries = 3
@@ -394,6 +394,11 @@ class ETRAPCDCAgent:
             value_str = data.get('value', '{}')
             if not value_str or value_str.strip() == '':
                 value_str = '{}'
+            
+            # Skip messages with "default" value (Debezium duplicate messages)
+            if value_str == 'default':
+                return None
+                
             value_data = json.loads(value_str)
             
             # Handle empty or missing key data  
