@@ -23,6 +23,14 @@ except ImportError:
     NEAR_AVAILABLE = False
     print("⚠️  near-api-py not installed. Install with: pip install near-api-py")
 
+# ETRAP SDK imports for consistent transaction processing
+try:
+    from etrap_sdk import ETRAPClient
+    ETRAP_SDK_AVAILABLE = True
+except ImportError:
+    ETRAP_SDK_AVAILABLE = False
+    print("⚠️  etrap-sdk not installed. Transaction hashing will use legacy implementation")
+
 class ETRAPCDCAgent:
     def __init__(self, 
                  redis_host='localhost', 
@@ -85,6 +93,19 @@ class ETRAPCDCAgent:
             'nfts_minted': 0,
             'nft_failures': 0
         }
+        
+        # Initialize ETRAP SDK client for consistent transaction processing
+        self.etrap_client = None
+        if ETRAP_SDK_AVAILABLE:
+            try:
+                self.etrap_client = ETRAPClient(
+                    organization_id=self.organization_id,
+                    network=self.near_network
+                )
+                print("✅ ETRAP SDK initialized for transaction processing")
+            except Exception as e:
+                print(f"⚠️  Failed to initialize ETRAP SDK: {e}")
+                print("   Falling back to legacy transaction hashing")
         
         # Initialize S3 bucket if needed
         self.ensure_s3_bucket()
@@ -233,6 +254,10 @@ class ETRAPCDCAgent:
             print(f"   🔗 NEAR account: {self.near_account} ({self.near_network})")
         else:
             print(f"   ⚠️  NEAR minting disabled (no account configured)")
+        if self.etrap_client:
+            print(f"   ✅ ETRAP SDK: Enabled for consistent transaction processing")
+        else:
+            print(f"   ℹ️  ETRAP SDK: Not available, using legacy hashing")
         print("-" * 60)
         
         while True:
@@ -624,68 +649,86 @@ class ETRAPCDCAgent:
             }
             
             # Create deterministic hash of the transaction
-            # For INSERT/UPDATE, hash the 'after' data; for DELETE, hash the 'before' data
-            if event['operation'] in ['INSERT', 'UPDATE'] and event['after']:
-                # Normalize the data to match database format before hashing
-                # This is necessary because Debezium converts timestamps to epoch format
-                normalized_data = event['after'].copy()
-                
-                # Convert epoch timestamps back to ISO format for any field ending in '_at'
-                for field, value in normalized_data.items():
-                    if field.endswith('_at'):
-                        # Check if it's already in ISO format (string)
-                        if isinstance(value, str):
-                            # Already in ISO format, no conversion needed
-                            continue
-                        # Check if it's an epoch timestamp that needs conversion
-                        elif isinstance(value, (int, float)) and value > 1000000000000:
-                            # Convert epoch microseconds or milliseconds to ISO format
-                            if value > 1000000000000000:  # Microseconds (16+ digits)
-                                dt = datetime.fromtimestamp(value / 1000000)
-                            else:  # Milliseconds (13 digits)
-                                dt = datetime.fromtimestamp(value / 1000)
-                            # Format to match PostgreSQL timestamp format
-                            iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-                            # Remove trailing zeros but keep at least milliseconds
-                            iso_str = iso_str.rstrip('0').rstrip('.')
-                            if '.' not in iso_str:
-                                iso_str += '.000'
-                            normalized_data[field] = iso_str
-                
-                tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
-            elif event['operation'] == 'DELETE' and event['before']:
-                # Normalize the data for DELETE operations too
-                normalized_data = event['before'].copy()
-                
-                # Convert epoch timestamps back to ISO format
-                for field, value in normalized_data.items():
-                    if field.endswith('_at'):
-                        # Check if it's already in ISO format (string)
-                        if isinstance(value, str):
-                            continue
-                        # Check if it's an epoch timestamp
-                        elif isinstance(value, (int, float)) and value > 1000000000000:
-                            if value > 1000000000000000:  # Microseconds
-                                dt = datetime.fromtimestamp(value / 1000000)
-                            else:  # Milliseconds
-                                dt = datetime.fromtimestamp(value / 1000)
-                            iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
-                            iso_str = iso_str.rstrip('0').rstrip('.')
-                            if '.' not in iso_str:
-                                iso_str += '.000'
-                            normalized_data[field] = iso_str
-                
-                tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
+            # Use SDK for consistent hashing if available, otherwise fall back to legacy
+            if self.etrap_client:
+                # Use SDK for consistent transaction processing
+                if event['operation'] in ['INSERT', 'UPDATE'] and event['after']:
+                    tx_hash = self.etrap_client.compute_transaction_hash(event['after'])
+                elif event['operation'] == 'DELETE' and event['before']:
+                    tx_hash = self.etrap_client.compute_transaction_hash(event['before'])
+                else:
+                    # Fallback for edge cases
+                    tx_data_to_hash = json.dumps({
+                        'operation': event['operation'],
+                        'key': event['key'],
+                        'before': event['before'],
+                        'after': event['after']
+                    }, sort_keys=True, separators=(',', ':'))
+                    tx_hash = hashlib.sha256(tx_data_to_hash.encode()).hexdigest()
             else:
-                # Fallback to full event structure
-                tx_data_to_hash = json.dumps({
-                    'operation': event['operation'],
-                    'key': event['key'],
-                    'before': event['before'],
-                    'after': event['after']
-                }, sort_keys=True, separators=(',', ':'))
-            
-            tx_hash = hashlib.sha256(tx_data_to_hash.encode()).hexdigest()
+                # Legacy implementation for backward compatibility
+                # For INSERT/UPDATE, hash the 'after' data; for DELETE, hash the 'before' data
+                if event['operation'] in ['INSERT', 'UPDATE'] and event['after']:
+                    # Normalize the data to match database format before hashing
+                    # This is necessary because Debezium converts timestamps to epoch format
+                    normalized_data = event['after'].copy()
+                    
+                    # Convert epoch timestamps back to ISO format for any field ending in '_at'
+                    for field, value in normalized_data.items():
+                        if field.endswith('_at'):
+                            # Check if it's already in ISO format (string)
+                            if isinstance(value, str):
+                                # Already in ISO format, no conversion needed
+                                continue
+                            # Check if it's an epoch timestamp that needs conversion
+                            elif isinstance(value, (int, float)) and value > 1000000000000:
+                                # Convert epoch microseconds or milliseconds to ISO format
+                                if value > 1000000000000000:  # Microseconds (16+ digits)
+                                    dt = datetime.fromtimestamp(value / 1000000)
+                                else:  # Milliseconds (13 digits)
+                                    dt = datetime.fromtimestamp(value / 1000)
+                                # Format to match PostgreSQL timestamp format
+                                iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+                                # Remove trailing zeros but keep at least milliseconds
+                                iso_str = iso_str.rstrip('0').rstrip('.')
+                                if '.' not in iso_str:
+                                    iso_str += '.000'
+                                normalized_data[field] = iso_str
+                    
+                    tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
+                elif event['operation'] == 'DELETE' and event['before']:
+                    # Normalize the data for DELETE operations too
+                    normalized_data = event['before'].copy()
+                    
+                    # Convert epoch timestamps back to ISO format
+                    for field, value in normalized_data.items():
+                        if field.endswith('_at'):
+                            # Check if it's already in ISO format (string)
+                            if isinstance(value, str):
+                                continue
+                            # Check if it's an epoch timestamp
+                            elif isinstance(value, (int, float)) and value > 1000000000000:
+                                if value > 1000000000000000:  # Microseconds
+                                    dt = datetime.fromtimestamp(value / 1000000)
+                                else:  # Milliseconds
+                                    dt = datetime.fromtimestamp(value / 1000)
+                                iso_str = dt.strftime('%Y-%m-%dT%H:%M:%S.%f')
+                                iso_str = iso_str.rstrip('0').rstrip('.')
+                                if '.' not in iso_str:
+                                    iso_str += '.000'
+                                normalized_data[field] = iso_str
+                    
+                    tx_data_to_hash = json.dumps(normalized_data, sort_keys=True, separators=(',', ':'))
+                else:
+                    # Fallback to full event structure
+                    tx_data_to_hash = json.dumps({
+                        'operation': event['operation'],
+                        'key': event['key'],
+                        'before': event['before'],
+                        'after': event['after']
+                    }, sort_keys=True, separators=(',', ':'))
+                
+                tx_hash = hashlib.sha256(tx_data_to_hash.encode()).hexdigest()
             
             # DEBUG: Show what we're hashing for ACC999
             # if normalized_data.get('account_id') == 'ACC999':
