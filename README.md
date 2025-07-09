@@ -29,6 +29,13 @@ The platform consists of four main components operating in a secure pipeline: fi
 ```
 This hybrid architecture ensures complete data sovereignty—no actual transaction data ever leaves the customer's premises—while still providing court-admissible blockchain proof of data integrity, making it ideal for regulatory compliance in financial services, healthcare, and government sectors where data privacy is paramount.
 
+## ETRAP Repos
+Other relevant repos are:
+
+- [ETRAP NEAR Smart Contract](https://github.com/marcoeg/etrap-notary)
+- [ETRAP Python SDK (includes verification CLI)](https://github.com/marcoeg/etrap-sdk)
+- [ETRAP MCP Server](https://github.com/marcoeg/etrap-mcp)
+
 ## ✨Key Features
 
 - **Real-time CDC**: Captures all database changes via Debezium/Redis
@@ -75,12 +82,6 @@ Captures database changes and creates blockchain-backed audit trails:
 [ETRAP CDC Agent Documentation](./cdc-agent/README_CDC.md)
 
 > Verification of transactions may be done with the read-only `etrap_verify_sdk.py` utility in the ETRAP [Python SDK repo](https://github.com/marcoeg/etrap-sdk). 
-
-## ETRAP Repos
-Other relevant repos are:
-
-- [ETRAP NEAR Smart Contract](https://github.com/marcoeg/etrap-notary)
-- [ETRAP Python SDK (includes verification CLI)](https://github.com/marcoeg/etrap-sdk)
 
 ## 🛠️ Installation
 
