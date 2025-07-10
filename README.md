@@ -1,4 +1,5 @@
 # ETRAP
+![](<docs/ETRAP hero.png>)
 
 ETRAP (Enterprise Transaction Receipt Anchoring Platform) is a blockchain-based audit trail platform 
 that captures database changes and creates immutable proofs on the NEAR blockchain. The platform 
