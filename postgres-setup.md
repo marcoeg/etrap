@@ -5,8 +5,6 @@ This guide documents the complete setup of PostgreSQL 14 with the AWS DMS sample
 ## Server Information
 - **OS**: Ubuntu 22.04.1 LTS (ARM/aarch64)
 - **Instance**: AWS EC2 with 8GB disk
-- **Public IP**: 54.213.201.149
-- **Private IP**: 10.0.0.34
 
 ## Prerequisites - Disk Space Cleanup
 
